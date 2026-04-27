@@ -21,7 +21,7 @@ func readNameCompletionCacheFile() (nameCompletionCacheFile, bool) {
 		return nameCompletionCacheFile{}, false
 	}
 
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // Cache path is derived from the user's config directory.
 	if err != nil {
 		return nameCompletionCacheFile{}, false
 	}
@@ -62,7 +62,7 @@ func storeNameCompletions(now time.Time, names []string) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
 
@@ -90,7 +90,7 @@ func storeNameCompletions(now time.Time, names []string) error {
 		return err
 	}
 
-	return os.Rename(tmp, path)
+	return os.Rename(tmp, path) //nolint:gosec // Atomic rename stays inside the cache directory.
 }
 
 func nameCompletionCachePath() (string, error) {

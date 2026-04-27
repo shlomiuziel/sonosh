@@ -42,11 +42,11 @@ func (c *Client) Subscribe(ctx context.Context, eventPath string, callbackURL st
 		req.Header.Set("TIMEOUT", fmt.Sprintf("Second-%d", int(requestedTimeout.Seconds())))
 	}
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req) //nolint:gosec // Sonos event URL targets the selected local speaker.
 	if err != nil {
 		return Subscription{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return Subscription{}, fmt.Errorf("subscribe failed: %s", resp.Status)
 	}
@@ -78,11 +78,11 @@ func (c *Client) Renew(ctx context.Context, sub Subscription, requestedTimeout t
 		req.Header.Set("TIMEOUT", fmt.Sprintf("Second-%d", int(requestedTimeout.Seconds())))
 	}
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req) //nolint:gosec // Sonos event URL targets an existing local subscription.
 	if err != nil {
 		return Subscription{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return Subscription{}, fmt.Errorf("renew failed: %s", resp.Status)
 	}
@@ -98,11 +98,11 @@ func (c *Client) Unsubscribe(ctx context.Context, sub Subscription) error {
 		return err
 	}
 	req.Header.Set("SID", sub.SID)
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req) //nolint:gosec // Sonos event URL targets an existing local subscription.
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == 412 {
 		// Precondition Failed: speaker rebooted or already unsubscribed. Treat as success.
 		return nil

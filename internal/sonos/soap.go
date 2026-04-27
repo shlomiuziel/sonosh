@@ -38,16 +38,16 @@ func soapCall(ctx context.Context, httpClient *http.Client, endpointURL, service
 	slog.Debug("soap: request", "action", action, "endpoint", endpointURL)
 	resp, err := doRequest(ctx, httpClient, req)
 	if err != nil {
-		slog.Debug("soap: request failed", "action", action, "endpoint", endpointURL, "elapsed", time.Since(start).String(), "err", err.Error())
+		slog.Debug("soap: request failed", "action", action, "endpoint", endpointURL, "elapsed", time.Since(start).String(), "err", err.Error()) //nolint:gosec // Debug log for local device endpoint diagnostics.
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug("soap: response", "action", action, "endpoint", endpointURL, "status", resp.StatusCode, "bytes", len(raw), "elapsed", time.Since(start).String())
+	slog.Debug("soap: response", "action", action, "endpoint", endpointURL, "status", resp.StatusCode, "bytes", len(raw), "elapsed", time.Since(start).String()) //nolint:gosec // Debug log for local device endpoint diagnostics.
 
 	if resp.StatusCode == 200 {
 		return parseSOAPResponse(raw)

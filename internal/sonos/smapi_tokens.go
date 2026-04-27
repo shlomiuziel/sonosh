@@ -11,8 +11,8 @@ import (
 )
 
 type SMAPITokenPair struct {
-	AuthToken   string    `json:"authToken"`
-	PrivateKey  string    `json:"privateKey"`
+	AuthToken   string    `json:"authToken"`  //nolint:gosec // Persisted Sonos SMAPI credential.
+	PrivateKey  string    `json:"privateKey"` //nolint:gosec // Persisted Sonos SMAPI credential.
 	UpdatedAt   time.Time `json:"updatedAt"`
 	LinkCode    string    `json:"linkCode,omitempty"`    // optional, for debugging
 	DeviceID    string    `json:"deviceId,omitempty"`    // optional, for debugging

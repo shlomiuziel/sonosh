@@ -31,7 +31,7 @@ func listenIPForRemote(remoteIP string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	udpAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 	if !ok || udpAddr.IP == nil {
 		return "", errors.New("could not determine local listen ip")
@@ -74,7 +74,7 @@ func newWatchCmd(flags *rootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer ln.Close()
+			defer func() { _ = ln.Close() }()
 			port := ln.Addr().(*net.TCPAddr).Port
 
 			callbackURL := fmt.Sprintf("http://%s:%d/notify", listenIP, port)

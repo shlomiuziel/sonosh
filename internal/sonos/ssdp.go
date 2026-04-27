@@ -48,7 +48,7 @@ func ssdpDiscover(ctx context.Context, timeout time.Duration) ([]ssdpResult, err
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	dst := &net.UDPAddr{IP: net.ParseIP("239.255.255.250"), Port: 1900}
 
@@ -65,10 +65,7 @@ func ssdpDiscover(ctx context.Context, timeout time.Duration) ([]ssdpResult, err
 
 	buf := make([]byte, 64*1024)
 Loop:
-	for {
-		if ssdpNow().After(deadline) {
-			break
-		}
+	for !ssdpNow().After(deadline) {
 		select {
 		case <-ctx.Done():
 			// Treat DeadlineExceeded like a normal timeout so callers can fall back.

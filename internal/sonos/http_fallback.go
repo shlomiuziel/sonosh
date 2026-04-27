@@ -29,7 +29,7 @@ func doRequest(ctx context.Context, httpClient *http.Client, req *http.Request) 
 		}
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // Primary client request is built from validated Sonos/Spotify URLs.
 	if err == nil {
 		return resp, nil
 	}
@@ -69,7 +69,7 @@ func shouldCurlFallback(req *http.Request, err error) bool {
 	if ip == nil {
 		return false
 	}
-	if !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()) {
+	if !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() {
 		return false
 	}
 	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
@@ -155,7 +155,7 @@ func curlRoundTrip(ctx context.Context, req *http.Request, timeout time.Duration
 	}
 	args = append(args, req.URL.String())
 
-	cmd := exec.CommandContext(ctx, curlPath, args...)
+	cmd := exec.CommandContext(ctx, curlPath, args...) //nolint:gosec // curl path is resolved once and args mirror the validated HTTP request.
 	if len(body) > 0 {
 		cmd.Stdin = bytes.NewReader(body)
 	}

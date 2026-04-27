@@ -37,7 +37,7 @@ func fetchDeviceDescription(ctx context.Context, httpClient *http.Client, locati
 	if err != nil {
 		return "", "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		return "", "", "", fmt.Errorf("device description: %s: %s", resp.Status, strings.TrimSpace(string(body)))

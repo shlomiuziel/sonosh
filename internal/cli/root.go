@@ -35,8 +35,10 @@ func Execute() error {
 	return nil
 }
 
-var newSonosClient = sonos.NewClient
-var sonosDiscover = sonos.Discover
+var (
+	newSonosClient = sonos.NewClient
+	sonosDiscover  = sonos.Discover
+)
 
 var loadAppConfig = func() (appconfig.Config, error) {
 	s, err := appconfig.NewDefaultStore()

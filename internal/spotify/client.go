@@ -37,7 +37,7 @@ func ParseSearchType(s string) (SearchType, error) {
 
 type Client struct {
 	ClientID     string
-	ClientSecret string
+	ClientSecret string //nolint:gosec // Spotify API client secret is loaded from user config.
 
 	AccountsBaseURL string
 	APIBaseURL      string
@@ -117,11 +117,11 @@ func (c *Client) Search(ctx context.Context, query string, typ SearchType, limit
 	}
 	req.Header.Set("Authorization", c.tokenType+" "+c.token)
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req) //nolint:gosec // Spotify API base URL is explicit client configuration.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("spotify search: %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -361,18 +361,18 @@ func (c *Client) fetchClientCredentialsToken(ctx context.Context) (token string,
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(c.ClientID+":"+c.ClientSecret)))
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req) //nolint:gosec // Spotify token endpoint is explicit client configuration.
 	if err != nil {
 		return "", "", 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return "", "", 0, fmt.Errorf("spotify token: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 
 	var tr struct {
-		AccessToken string `json:"access_token"`
+		AccessToken string `json:"access_token"` //nolint:gosec // OAuth token parsed from Spotify response.
 		TokenType   string `json:"token_type"`
 		ExpiresIn   int    `json:"expires_in"`
 	}

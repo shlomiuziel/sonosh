@@ -274,6 +274,6 @@ func TestSMAPI_GetMetadata_Success(t *testing.T) {
 }
 
 func ioReadAllLimit(r io.ReadCloser, limit int64) ([]byte, error) {
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	return io.ReadAll(io.LimitReader(r, limit))
 }

@@ -135,8 +135,8 @@ func (c *SMAPIClient) CompleteAuthentication(ctx context.Context, linkCode, link
 
 	var out struct {
 		Result struct {
-			AuthToken  string `xml:"authToken"`
-			PrivateKey string `xml:"privateKey"`
+			AuthToken  string `xml:"authToken"`  //nolint:gosec // SMAPI token returned by Sonos and stored intentionally.
+			PrivateKey string `xml:"privateKey"` //nolint:gosec // SMAPI key returned by Sonos and stored intentionally.
 		} `xml:"getDeviceAuthTokenResult"`
 	}
 	if err := c.smapiCallInto(ctx, "getDeviceAuthToken", map[string]string{
@@ -394,11 +394,11 @@ func fetchPresentationMapURIFromManifest(ctx context.Context, httpClient *http.C
 	if err != nil {
 		return "", err
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // SMAPI manifest URL is provided by the selected Sonos service.
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("manifest: http %s", resp.Status)
 	}
@@ -451,11 +451,11 @@ func (c *SMAPIClient) smapiCall(ctx context.Context, method string, args map[str
 	req.Header.Set("Content-Type", `text/xml; charset="utf-8"`)
 	req.Header.Set("SOAPACTION", fmt.Sprintf("%q", smapiSOAPAction+method))
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // SMAPI endpoint is discovered from Sonos service metadata.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
 		return nil, err
@@ -489,11 +489,11 @@ func (c *SMAPIClient) smapiCall(ctx context.Context, method string, args map[str
 			req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(body))
 			req2.Header.Set("Content-Type", `text/xml; charset="utf-8"`)
 			req2.Header.Set("SOAPACTION", fmt.Sprintf("%q", smapiSOAPAction+method))
-			resp2, err := c.httpClient.Do(req2)
+			resp2, err := c.httpClient.Do(req2) //nolint:gosec // SMAPI endpoint is discovered from Sonos service metadata.
 			if err != nil {
 				return nil, err
 			}
-			defer resp2.Body.Close()
+			defer func() { _ = resp2.Body.Close() }()
 			raw2, err := io.ReadAll(io.LimitReader(resp2.Body, 4<<20))
 			if err != nil {
 				return nil, err

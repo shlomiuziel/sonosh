@@ -19,11 +19,11 @@ func fetchAndParsePresentationMap(ctx context.Context, httpClient *http.Client, 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // Presentation map URI is discovered from Sonos service metadata.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("presentation map: http %s", resp.Status)
 	}
@@ -32,13 +32,6 @@ func fetchAndParsePresentationMap(ctx context.Context, httpClient *http.Client, 
 		return nil, err
 	}
 	return parsePresentationMapXML(raw)
-}
-
-type pmapEnvelope struct {
-	SearchCategories *struct {
-		Categories       []pmapCategory       `xml:"Category"`
-		CustomCategories []pmapCustomCategory `xml:"CustomCategory"`
-	} `xml:"SearchCategories"`
 }
 
 type pmapCategory struct {
