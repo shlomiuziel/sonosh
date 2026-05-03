@@ -38,7 +38,7 @@ jobs:
           awk -v cov="${total}" 'BEGIN { exit !(cov+0 >= 70.0) }' || { echo "coverage floor not met (min 70.0%)"; exit 1; }
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9.2.0
         with:
-          version: v1.61.0
+          version: v2.12.1
           args: ./...
