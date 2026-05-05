@@ -2,6 +2,7 @@ package sonos
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -191,12 +192,16 @@ func TestSMAPIClient_BeginAuthentication_AppLinkAndSearchCategories(t *testing.T
 	}
 
 	// AppLink begin auth happy path
+	var seenAppLinkBody string
 	mux := http.NewServeMux()
 	mux.HandleFunc("/smapi", func(w http.ResponseWriter, r *http.Request) {
 		action := strings.Trim(r.Header.Get("SOAPACTION"), `"`)
 		if action != smapiSOAPAction+"getAppLink" {
 			t.Fatalf("SOAPACTION: %q", action)
 		}
+		body, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		seenAppLinkBody = string(body)
 		_, _ = w.Write([]byte(`<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
@@ -229,6 +234,16 @@ func TestSMAPIClient_BeginAuthentication_AppLinkAndSearchCategories(t *testing.T
 	}
 	if begin.LinkCode != "WXYZ" || begin.RegURL != "https://example.com/applink" {
 		t.Fatalf("unexpected begin: %#v", begin)
+	}
+	for _, want := range []string{
+		"<callbackPath></callbackPath>",
+		"<hardware>CLI</hardware>",
+		"<osVersion>1.0</osVersion>",
+		"<sonosAppName>sonoscli</sonosAppName>",
+	} {
+		if !strings.Contains(seenAppLinkBody, want) {
+			t.Fatalf("expected AppLink request to contain %s, got: %s", want, seenAppLinkBody)
+		}
 	}
 
 	sm4 := &SMAPIClient{Service: MusicServiceDescriptor{Name: "Svc", Auth: MusicServiceAuthAnonymous}}

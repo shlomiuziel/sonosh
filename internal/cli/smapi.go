@@ -478,18 +478,7 @@ func newSMAPISearchCmd(flags *rootFlags) *cobra.Command {
 					return fmt.Errorf("--index %d out of range (got %d results)", index, len(flat))
 				}
 				selected := flat[index-1]
-				ref := selected.ID
-				if _, ok := sonos.ParseSpotifyRef(ref); !ok {
-					return errors.New("selected result is not a supported Spotify ref: " + ref)
-				}
-				c, err := newSonosEnqueuer(ctx, flags)
-				if err != nil {
-					return err
-				}
-				_, err = c.EnqueueSpotify(ctx, ref, sonos.EnqueueOptions{
-					PlayNow: doOpen,
-				})
-				if err != nil {
+				if err := enqueueSMAPISelection(ctx, flags, svc, selected, doOpen); err != nil {
 					return err
 				}
 			}
@@ -607,18 +596,7 @@ func newSMAPIBrowseCmd(flags *rootFlags) *cobra.Command {
 					return fmt.Errorf("--index %d out of range (got %d results)", index, len(flat))
 				}
 				selected := flat[index-1]
-				ref := selected.ID
-				if _, ok := sonos.ParseSpotifyRef(ref); !ok {
-					return errors.New("selected result is not a supported Spotify ref: " + ref)
-				}
-				c, err := newSonosEnqueuer(ctx, flags)
-				if err != nil {
-					return err
-				}
-				_, err = c.EnqueueSpotify(ctx, ref, sonos.EnqueueOptions{
-					PlayNow: doOpen,
-				})
-				if err != nil {
+				if err := enqueueSMAPISelection(ctx, flags, svc, selected, doOpen); err != nil {
 					return err
 				}
 			}
@@ -666,4 +644,27 @@ func newSMAPIBrowseCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().IntVar(&index, "index", 1, "Which result to use with --open/--enqueue (1-based)")
 
 	return cmd
+}
+
+func enqueueSMAPISelection(ctx context.Context, flags *rootFlags, svc sonos.MusicServiceDescriptor, selected sonos.SMAPIItem, playNow bool) error {
+	c, err := coordinatorClient(ctx, flags)
+	if err != nil {
+		return err
+	}
+
+	ref := strings.TrimSpace(selected.ID)
+	title := strings.TrimSpace(selected.Title)
+	if _, ok := sonos.ParseSpotifyRef(ref); ok {
+		_, err = c.EnqueueSpotify(ctx, ref, sonos.EnqueueOptions{
+			Title:   title,
+			PlayNow: playNow,
+		})
+		return err
+	}
+
+	_, err = c.EnqueueSMAPIItem(ctx, svc, selected, sonos.EnqueueOptions{
+		Title:   title,
+		PlayNow: playNow,
+	})
+	return err
 }

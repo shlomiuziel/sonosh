@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +47,7 @@ type fakeSonosSMAPIServer struct {
 	playCalls         atomic.Int32
 	addURIToQueueCall atomic.Int32
 	authTokenCalls    atomic.Int32
+	lastAddURIToQueue atomic.Value
 }
 
 func newFakeSonosSMAPIServer(t *testing.T) *fakeSonosSMAPIServer {
@@ -79,6 +81,12 @@ func newFakeSonosSMAPIServer(t *testing.T) *fakeSonosSMAPIServer {
 		servicesXML := `<Services SchemaVersion="1">
   <Service Id="2311" Name="Spotify" Version="1.1" Uri="http://example" SecureUri="` + fs.srv.URL + `/smapi" ContainerType="MService" Capabilities="513">
     <Policy Auth="DeviceLink" />
+    <Presentation>
+      <PresentationMap Version="2" Uri="` + fs.srv.URL + `/pmap" />
+    </Presentation>
+  </Service>
+  <Service Id="23" Name="QQ音乐" Version="1.1" Uri="http://example" SecureUri="` + fs.srv.URL + `/smapi" ContainerType="MService" Capabilities="513">
+    <Policy Auth="AppLink" />
     <Presentation>
       <PresentationMap Version="2" Uri="` + fs.srv.URL + `/pmap" />
     </Presentation>
@@ -134,6 +142,9 @@ func newFakeSonosSMAPIServer(t *testing.T) *fakeSonosSMAPIServer {
 		action := r.Header.Get("SOAPACTION")
 		switch {
 		case strings.Contains(action, "AVTransport:1#AddURIToQueue"):
+			bodyBytes, _ := io.ReadAll(r.Body)
+			_ = r.Body.Close()
+			fs.lastAddURIToQueue.Store(string(bodyBytes))
 			fs.addURIToQueueCall.Add(1)
 			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
 			_, _ = w.Write([]byte(`<?xml version="1.0"?>
@@ -176,6 +187,9 @@ func newFakeSonosSMAPIServer(t *testing.T) *fakeSonosSMAPIServer {
 	// SMAPI endpoint.
 	mux.HandleFunc("/smapi", func(w http.ResponseWriter, r *http.Request) {
 		action := strings.Trim(r.Header.Get("SOAPACTION"), `"`)
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		body := string(bodyBytes)
 		switch action {
 		case "http://www.sonos.com/Services/1.1#getDeviceLinkCode":
 			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
@@ -222,6 +236,28 @@ func newFakeSonosSMAPIServer(t *testing.T) *fakeSonosSMAPIServer {
 </s:Envelope>`))
 		case "http://www.sonos.com/Services/1.1#search":
 			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			if strings.Contains(body, "<term>qq</term>") {
+				_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <searchResponse xmlns="http://www.sonos.com/Services/1.1">
+      <searchResult>
+        <index>0</index>
+        <count>1</count>
+        <total>1</total>
+        <mediaMetadata>
+          <id>SONG:449205:ST</id>
+          <itemType>track</itemType>
+          <title>稻香</title>
+          <mimeType>audio/mp4</mimeType>
+          <summary></summary>
+        </mediaMetadata>
+      </searchResult>
+    </searchResponse>
+  </s:Body>
+</s:Envelope>`))
+				return
+			}
 			_, _ = w.Write([]byte(`<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
@@ -346,6 +382,46 @@ func TestSMAPISearchCmd_OpenPlaysOnSonos(t *testing.T) {
 	}
 	if fs.playCalls.Load() == 0 {
 		t.Fatalf("expected Play to be called")
+	}
+}
+
+func TestSMAPISearchCmd_EnqueuesNonSpotifyServiceItem(t *testing.T) {
+	fs := newFakeSonosSMAPIServer(t)
+	u, _ := url.Parse(fs.srv.URL)
+	port, _ := strconv.Atoi(u.Port())
+
+	oldNew := newSonosClient
+	oldStore := newSMAPITokenStore
+	t.Cleanup(func() {
+		newSonosClient = oldNew
+		newSMAPITokenStore = oldStore
+	})
+
+	store := &memTokenStore{}
+	_ = store.Save("23", "Sonos_TEST", sonos.SMAPITokenPair{AuthToken: "t", PrivateKey: "k"})
+	newSMAPITokenStore = func() (sonos.SMAPITokenStore, error) { return store, nil }
+
+	newSonosClient = func(ip string, timeout time.Duration) *sonos.Client {
+		return &sonos.Client{IP: u.Hostname(), Port: port, HTTP: fs.srv.Client()}
+	}
+
+	flags := &rootFlags{IP: u.Hostname(), Timeout: 2 * time.Second, Format: formatJSON}
+	out, err := execute(t, newSMAPISearchCmd(flags), "--service", "QQ音乐", "--category", "tracks", "--enqueue", "--index", "1", "qq")
+	if err != nil {
+		t.Fatalf("smapi search --enqueue: %v", err)
+	}
+	if !strings.Contains(out, "\"selected\"") || !strings.Contains(out, "SONG:449205:ST") {
+		t.Fatalf("unexpected output: %q", out)
+	}
+	body, _ := fs.lastAddURIToQueue.Load().(string)
+	if !strings.Contains(body, "<EnqueuedURI>soco://SONG%3A449205%3AST?sid=23&amp;sn=0</EnqueuedURI>") {
+		t.Fatalf("expected generic SMAPI enqueue URI, body: %s", body)
+	}
+	if !strings.Contains(body, "SA_RINCON5895_X_#Svc5895-0-Token") {
+		t.Fatalf("expected SMAPI service descriptor, body: %s", body)
+	}
+	if fs.playCalls.Load() != 0 {
+		t.Fatalf("enqueue-only should not call Play")
 	}
 }
 

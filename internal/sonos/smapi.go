@@ -109,7 +109,11 @@ func (c *SMAPIClient) BeginAuthentication(ctx context.Context) (SMAPIBeginAuthRe
 			} `xml:"getAppLinkResult"`
 		}
 		if err := c.smapiCallInto(ctx, "getAppLink", map[string]string{
-			"householdId": c.HouseholdID,
+			"callbackPath": "",
+			"hardware":     "CLI",
+			"householdId":  c.HouseholdID,
+			"osVersion":    "1.0",
+			"sonosAppName": "sonoscli",
 		}, &out, smapiCallOptions{AllowUnauthed: true}); err != nil {
 			return SMAPIBeginAuthResult{}, err
 		}
