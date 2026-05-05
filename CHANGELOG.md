@@ -6,6 +6,7 @@
 - Spotify track/episode enqueue now tries Sonos `sid`/`sn` queue URIs before legacy forms, improving compatibility with speakers that reject the older track URI shape. Thanks @WinnCook.
 - `sonos smapi search|browse --open/--enqueue` can now enqueue non-Spotify SMAPI items using the generic Sonos queue path instead of rejecting them as unsupported Spotify refs.
 - SMAPI AppLink auth requests now include the client metadata expected by AppLink services such as QQ Music.
+- SMAPI AppLink auth now reports native app authentication URLs instead of printing empty link instructions for services such as Apple Music that do not return a device-link code.
 
 ## [0.1.1] - 2025-12-14
 

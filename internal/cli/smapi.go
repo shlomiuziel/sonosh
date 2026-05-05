@@ -244,14 +244,21 @@ func newSMAPIAuthBeginCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Service: %s\n", svc.Name)
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open this URL and link your account:\n  %s\n", res.RegURL)
-			_, _ = fmt.Fprintf(
-				cmd.OutOrStdout(),
-				"Then run:\n  sonos auth smapi complete --service %q --code %s --wait 5m\n",
-				svc.Name,
-				res.LinkCode,
-			)
-			return nil
+			if res.RegURL != "" && res.LinkCode != "" {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open this URL and link your account:\n  %s\n", res.RegURL)
+				completeCmd := fmt.Sprintf("sonos auth smapi complete --service %q --code %s --wait 5m", svc.Name, res.LinkCode)
+				if res.LinkDeviceID != "" {
+					completeCmd += fmt.Sprintf(" --link-device-id %s", res.LinkDeviceID)
+				}
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Then run:\n  %s\n", completeCmd)
+				return nil
+			}
+			if res.AppURL != "" {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open this app authentication URL on a device with the service app installed:\n  %s\n", res.AppURL)
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "This AppLink response did not include a device-link code; sonoscli cannot complete token storage automatically.")
+				return nil
+			}
+			return errors.New("service returned no authentication URL")
 		},
 	}
 	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")

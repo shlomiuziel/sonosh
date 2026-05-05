@@ -315,6 +315,8 @@ Search via Sonos (SMAPI; no Spotify Web API credentials):
 ./sonos smapi search --service "Spotify" --category tracks --open --name "Office" "gareth emery"
 ```
 
+Some AppLink services only return a native app authentication URL and no device-link code. In that case, `auth smapi begin` prints the app URL and notes that `sonoscli` cannot complete token storage automatically.
+
 Play from a search query (shortcut for SMAPI search + open):
 
 ```bash

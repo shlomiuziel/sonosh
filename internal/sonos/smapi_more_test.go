@@ -246,6 +246,81 @@ func TestSMAPIClient_BeginAuthentication_AppLinkAndSearchCategories(t *testing.T
 		}
 	}
 
+	// Some AppLink services, including Apple Music, return only native app URLs
+	// when the request looks like it came from a Sonos mobile controller.
+	var appLinkRequests int
+	mux2 := http.NewServeMux()
+	mux2.HandleFunc("/smapi", func(w http.ResponseWriter, r *http.Request) {
+		appLinkRequests++
+		body, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		bodyText := string(body)
+		if appLinkRequests == 1 {
+			_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <ns2:getAppLinkResponse xmlns:ns2="http://www.sonos.com/Services/1.1">
+      <ns2:getAppLinkResult>
+        <ns2:callToAction/>
+        <ns2:appUrlEncrypt>true</ns2:appUrlEncrypt>
+      </ns2:getAppLinkResult>
+    </ns2:getAppLinkResponse>
+  </s:Body>
+</s:Envelope>`))
+			return
+		}
+		for _, want := range []string{
+			"<hardware>iPhone15,2</hardware>",
+			"<osVersion>Version 17.5</osVersion>",
+			"<sonosAppName>ICRU_iPhone15,2</sonosAppName>",
+			"sid%3D204%26OAuthDeviceID%3DSonos_TEST%26callbackPath%3D%2FaddAccount",
+		} {
+			if !strings.Contains(bodyText, want) {
+				t.Fatalf("expected AppLink retry request to contain %s, got: %s", want, bodyText)
+			}
+		}
+		_, _ = w.Write([]byte(`<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <ns2:getAppLinkResponse xmlns:ns2="http://www.sonos.com/Services/1.1">
+      <ns2:getAppLinkResult>
+        <ns2:authorizeAccount>
+          <ns2:appUrl>music://authorize</ns2:appUrl>
+          <ns2:appUrlStringId>LoginAppleMusic</ns2:appUrlStringId>
+        </ns2:authorizeAccount>
+        <ns2:createAccount>
+          <ns2:appUrl>music://trial</ns2:appUrl>
+          <ns2:appUrlStringId>StartTrial</ns2:appUrlStringId>
+        </ns2:createAccount>
+        <ns2:appUrlEncrypt>true</ns2:appUrlEncrypt>
+      </ns2:getAppLinkResult>
+    </ns2:getAppLinkResponse>
+  </s:Body>
+</s:Envelope>`))
+	})
+	srv2 := httptest.NewServer(mux2)
+	t.Cleanup(srv2.Close)
+	smApple := &SMAPIClient{
+		httpClient:  srv2.Client(),
+		Service:     MusicServiceDescriptor{ID: "204", Name: "Apple Music", SecureURI: srv2.URL + "/smapi", Auth: MusicServiceAuthAppLink},
+		HouseholdID: "Sonos_TEST",
+		DeviceID:    "DEV",
+		TokenStore:  &memSMAPITokenStore{},
+	}
+	appleBegin, err := smApple.BeginAuthentication(context.Background())
+	if err != nil {
+		t.Fatalf("BeginAuthentication(native AppLink): %v", err)
+	}
+	if appleBegin.AppURL != "music://authorize" || appleBegin.AppURLStringID != "LoginAppleMusic" || !appleBegin.AppURLEncrypt {
+		t.Fatalf("unexpected native AppLink result: %#v", appleBegin)
+	}
+	if appleBegin.CreateAccountURL != "music://trial" || appleBegin.CreateAccountURLStringID != "StartTrial" {
+		t.Fatalf("unexpected create-account AppLink result: %#v", appleBegin)
+	}
+	if appLinkRequests != 2 {
+		t.Fatalf("expected AppLink retry, got %d requests", appLinkRequests)
+	}
+
 	sm4 := &SMAPIClient{Service: MusicServiceDescriptor{Name: "Svc", Auth: MusicServiceAuthAnonymous}}
 	if _, err := sm4.BeginAuthentication(context.Background()); err == nil {
 		t.Fatalf("expected error for unsupported auth")

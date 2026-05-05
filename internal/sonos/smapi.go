@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -70,9 +71,14 @@ func NewSMAPIClient(ctx context.Context, speaker *Client, svc MusicServiceDescri
 }
 
 type SMAPIBeginAuthResult struct {
-	RegURL       string `json:"regUrl"`
-	LinkCode     string `json:"linkCode"`
-	LinkDeviceID string `json:"linkDeviceId,omitempty"`
+	RegURL                   string `json:"regUrl"`
+	LinkCode                 string `json:"linkCode"`
+	LinkDeviceID             string `json:"linkDeviceId,omitempty"`
+	AppURL                   string `json:"appUrl,omitempty"`
+	AppURLStringID           string `json:"appUrlStringId,omitempty"`
+	CreateAccountURL         string `json:"createAccountUrl,omitempty"`
+	CreateAccountURLStringID string `json:"createAccountUrlStringId,omitempty"`
+	AppURLEncrypt            bool   `json:"appUrlEncrypt,omitempty"`
 }
 
 func (c *SMAPIClient) BeginAuthentication(ctx context.Context) (SMAPIBeginAuthResult, error) {
@@ -96,35 +102,79 @@ func (c *SMAPIClient) BeginAuthentication(ctx context.Context) (SMAPIBeginAuthRe
 			LinkDeviceID: strings.TrimSpace(out.Result.LinkDeviceID),
 		}, nil
 	case MusicServiceAuthAppLink:
-		// AppLink returns authorizeAccount/deviceLink inside getAppLinkResult.
-		var out struct {
-			Result struct {
-				AuthorizeAccount struct {
-					DeviceLink struct {
-						RegURL       string `xml:"regUrl"`
-						LinkCode     string `xml:"linkCode"`
-						LinkDeviceID string `xml:"linkDeviceId"`
-					} `xml:"deviceLink"`
-				} `xml:"authorizeAccount"`
-			} `xml:"getAppLinkResult"`
-		}
-		if err := c.smapiCallInto(ctx, "getAppLink", map[string]string{
+		res, err := c.getAppLink(ctx, map[string]string{
 			"callbackPath": "",
 			"hardware":     "CLI",
 			"householdId":  c.HouseholdID,
 			"osVersion":    "1.0",
 			"sonosAppName": "sonoscli",
-		}, &out, smapiCallOptions{AllowUnauthed: true}); err != nil {
+		})
+		if err != nil {
 			return SMAPIBeginAuthResult{}, err
 		}
-		return SMAPIBeginAuthResult{
-			RegURL:       strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.RegURL),
-			LinkCode:     strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.LinkCode),
-			LinkDeviceID: strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.LinkDeviceID),
-		}, nil
+		if !res.empty() {
+			return res, nil
+		}
+
+		res, err = c.getAppLink(ctx, map[string]string{
+			"callbackPath": appLinkCallbackPath(c.Service.ID, c.HouseholdID),
+			"hardware":     "iPhone15,2",
+			"householdId":  c.HouseholdID,
+			"osVersion":    "Version 17.5",
+			"sonosAppName": "ICRU_iPhone15,2",
+		})
+		if err != nil {
+			return SMAPIBeginAuthResult{}, err
+		}
+		if res.empty() {
+			return SMAPIBeginAuthResult{}, errors.New("service returned no AppLink device link or app URL")
+		}
+		return res, nil
 	default:
 		return SMAPIBeginAuthResult{}, fmt.Errorf("service auth type %q does not support begin auth", c.Service.Auth)
 	}
+}
+
+func (r SMAPIBeginAuthResult) empty() bool {
+	return r.RegURL == "" && r.LinkCode == "" && r.LinkDeviceID == "" && r.AppURL == "" && r.CreateAccountURL == ""
+}
+
+func (c *SMAPIClient) getAppLink(ctx context.Context, args map[string]string) (SMAPIBeginAuthResult, error) {
+	var out struct {
+		Result struct {
+			AuthorizeAccount smapiAppLinkAction `xml:"authorizeAccount"`
+			CreateAccount    smapiAppLinkAction `xml:"createAccount"`
+			AppURLEncrypt    bool               `xml:"appUrlEncrypt"`
+		} `xml:"getAppLinkResult"`
+	}
+	if err := c.smapiCallInto(ctx, "getAppLink", args, &out, smapiCallOptions{AllowUnauthed: true}); err != nil {
+		return SMAPIBeginAuthResult{}, err
+	}
+	return SMAPIBeginAuthResult{
+		RegURL:                   strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.RegURL),
+		LinkCode:                 strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.LinkCode),
+		LinkDeviceID:             strings.TrimSpace(out.Result.AuthorizeAccount.DeviceLink.LinkDeviceID),
+		AppURL:                   strings.TrimSpace(out.Result.AuthorizeAccount.AppURL),
+		AppURLStringID:           strings.TrimSpace(out.Result.AuthorizeAccount.AppURLStringID),
+		CreateAccountURL:         strings.TrimSpace(out.Result.CreateAccount.AppURL),
+		CreateAccountURLStringID: strings.TrimSpace(out.Result.CreateAccount.AppURLStringID),
+		AppURLEncrypt:            out.Result.AppURLEncrypt,
+	}, nil
+}
+
+type smapiAppLinkAction struct {
+	AppURL         string `xml:"appUrl"`
+	AppURLStringID string `xml:"appUrlStringId"`
+	DeviceLink     struct {
+		RegURL       string `xml:"regUrl"`
+		LinkCode     string `xml:"linkCode"`
+		LinkDeviceID string `xml:"linkDeviceId"`
+	} `xml:"deviceLink"`
+}
+
+func appLinkCallbackPath(serviceID, householdID string) string {
+	state := "sid=" + strings.TrimSpace(serviceID) + "&OAuthDeviceID=" + strings.TrimSpace(householdID) + "&callbackPath=/addAccount"
+	return "sonos://x-callback-url/addAccount?state=" + url.QueryEscape(state)
 }
 
 func (c *SMAPIClient) CompleteAuthentication(ctx context.Context, linkCode, linkDeviceID string) (SMAPITokenPair, error) {
