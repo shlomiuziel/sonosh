@@ -8,7 +8,8 @@
     "test": "go test ./...",
     "format": "gofmt -w .",
     "format:check": "test -z \"$(gofmt -l .)\"",
-    "lint": "golangci-lint run ./..."
+    "lint": "golangci-lint run ./...",
+    "docs:site": "node scripts/build-docs-site.mjs"
   }
 }
 

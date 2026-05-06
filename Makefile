@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check lint test build ci
+.PHONY: fmt fmt-check lint test build ci docs-site
 
 fmt:
 	gofmt -w .
@@ -18,3 +18,6 @@ lint:
 
 ci: fmt-check test
 	go vet ./...
+
+docs-site:
+	node scripts/build-docs-site.mjs
