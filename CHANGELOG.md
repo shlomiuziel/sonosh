@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.2] - Unreleased
+## [0.2.0] - 2026-05-06
 
 ### Added
 - Release automation now publishes GoReleaser builds from tags and can backfill an existing tag.
