@@ -2,11 +2,19 @@
 
 ## [0.1.2] - Unreleased
 
+### Added
+- Release automation now publishes GoReleaser builds from tags and can backfill an existing tag.
+- Release artifacts now include Linux arm64 and Windows arm64 builds.
+- Release automation now dispatches the Homebrew tap updater after publishing, using the GoReleaser macOS arm64 archive name.
+
 ### Fixed
 - Spotify track/episode enqueue now tries Sonos `sid`/`sn` queue URIs before legacy forms, improving compatibility with speakers that reject the older track URI shape. Thanks @WinnCook.
 - `sonos smapi search|browse --open/--enqueue` can now enqueue non-Spotify SMAPI items using the generic Sonos queue path instead of rejecting them as unsupported Spotify refs.
 - SMAPI AppLink auth requests now include the client metadata expected by AppLink services such as QQ Music.
 - SMAPI AppLink auth now reports native app authentication URLs instead of printing empty link instructions for services such as Apple Music that do not return a device-link code.
+
+### Changed
+- GitHub Actions workflows now use the Node 24 based official checkout/setup-go actions.
 
 ## [0.1.1] - 2025-12-14
 
