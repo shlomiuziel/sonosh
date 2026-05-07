@@ -58,3 +58,31 @@ func (s *Server) ffmpegCommand(ctx context.Context, streamURL string) *exec.Cmd 
 		"pipe:1",
 	)
 }
+
+func (s *Server) ffmpegStdinCommand(ctx context.Context) *exec.Cmd {
+	//nolint:gosec // ffmpeg path is an explicit CLI option; input is read from stdin.
+	return exec.CommandContext(ctx, strings.TrimSpace(s.cfg.FFmpegPath),
+		"-hide_banner",
+		"-loglevel", "error",
+		"-i", "pipe:0",
+		"-vn",
+		"-ac", "2",
+		"-ar", "44100",
+		"-codec:a", "libmp3lame",
+		"-b:a", s.cfg.Bitrate,
+		"-f", "mp3",
+		"pipe:1",
+	)
+}
+
+func (s *Server) ytDLPDownloadCommand(ctx context.Context, sourceURL string) *exec.Cmd {
+	//nolint:gosec // yt-dlp path is configured by CLI flag; the source URL was supplied by the user.
+	return exec.CommandContext(ctx, strings.TrimSpace(s.cfg.YTDLPPath),
+		"--no-playlist",
+		"--no-warnings",
+		"--quiet",
+		"-f", strings.TrimSpace(s.cfg.Format),
+		"-o", "-",
+		sourceURL,
+	)
+}

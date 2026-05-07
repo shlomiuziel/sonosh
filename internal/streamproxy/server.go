@@ -8,27 +8,26 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Server struct {
-	cfg      ServerConfig
-	resolver Resolver
-	mu       sync.Mutex
-	active   int
-	served   bool
-	done     chan struct{}
-	once     sync.Once
+	cfg    ServerConfig
+	mu     sync.Mutex
+	active int
+	served bool
+	done   chan struct{}
+	once   sync.Once
 }
 
 func NewServer(cfg ServerConfig) *Server {
 	cfg = cfg.withDefaults()
 	return &Server{
-		cfg:      cfg,
-		resolver: Resolver{YTDLPPath: cfg.YTDLPPath, Format: cfg.Format},
-		done:     make(chan struct{}),
+		cfg:  cfg,
+		done: make(chan struct{}),
 	}
 }
 
@@ -72,7 +71,6 @@ func (s *Server) Preflight(ctx context.Context) error {
 		return err
 	}
 	s.cfg = cfg
-	s.resolver = Resolver{YTDLPPath: cfg.YTDLPPath, Format: cfg.Format}
 	return nil
 }
 
@@ -151,23 +149,50 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 	}()
 
-	streamURL, err := s.resolver.ResolveStreamURL(r.Context(), s.cfg.Source)
-	if err != nil {
-		log.Printf("resolve stream URL failed: %v", err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
+	var ytCmd *exec.Cmd
+	var cmd *exec.Cmd
+	if s.cfg.Source.UseYTDLP {
+		log.Printf("client %q requested stream; piping yt-dlp source=%q", r.RemoteAddr, s.cfg.Source.URL) //nolint:gosec // diagnostic log only; values are quoted.
+		ytCmd = s.ytDLPDownloadCommand(r.Context(), s.cfg.Source.URL)
+		ytStdout, err := ytCmd.StdoutPipe()
+		if err != nil {
+			log.Printf("yt-dlp stdout pipe failed: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ytCmd.Stderr = os.Stderr
+		if err := ytCmd.Start(); err != nil {
+			log.Printf("yt-dlp start failed: %v", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		cmd = s.ffmpegStdinCommand(r.Context())
+		cmd.Stdin = ytStdout
+	} else {
+		streamURL := strings.TrimSpace(s.cfg.Source.InputURL)
+		if streamURL == "" {
+			streamURL = strings.TrimSpace(s.cfg.Source.URL)
+		}
+		log.Printf("client %q requested stream; resolved input=%q", r.RemoteAddr, streamURL) //nolint:gosec // diagnostic log only; values are quoted.
+		cmd = s.ffmpegCommand(r.Context(), streamURL)
 	}
-	log.Printf("client %q requested stream; resolved input=%q", r.RemoteAddr, streamURL) //nolint:gosec // diagnostic log only; values are quoted.
 
-	cmd := s.ffmpegCommand(r.Context(), streamURL)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		if ytCmd != nil {
+			_ = ytCmd.Process.Kill()
+			_ = ytCmd.Wait()
+		}
 		log.Printf("ffmpeg stdout pipe failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
+		if ytCmd != nil {
+			_ = ytCmd.Process.Kill()
+			_ = ytCmd.Wait()
+		}
 		log.Printf("ffmpeg start failed: %v", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -175,6 +200,10 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
+		if ytCmd != nil {
+			_ = ytCmd.Process.Kill()
+			_ = ytCmd.Wait()
+		}
 	}()
 
 	writer := io.Writer(w)
