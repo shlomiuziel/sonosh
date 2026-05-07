@@ -83,11 +83,13 @@ func (s *Server) shutdownWhenDone(ctx context.Context, srv *http.Server) {
 	for {
 		select {
 		case <-ctx.Done():
-			_ = srv.Shutdown(context.Background())
+			shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			_ = srv.Shutdown(shutdownCtx)
+			cancel()
 			return
 		case <-s.done:
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			_ = srv.Shutdown(ctx)
+			shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			_ = srv.Shutdown(shutdownCtx)
 			cancel()
 			return
 		case <-ticker.C:
@@ -100,11 +102,15 @@ func (s *Server) shutdownWhenDone(ctx context.Context, srv *http.Server) {
 				continue
 			}
 			if served && time.Since(lastIdle) >= s.cfg.IdleTimeout {
-				_ = srv.Shutdown(context.Background())
+				shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+				_ = srv.Shutdown(shutdownCtx)
+				cancel()
 				return
 			}
 			if !served && time.Since(lastIdle) >= s.cfg.IdleTimeout {
-				_ = srv.Shutdown(context.Background())
+				shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+				_ = srv.Shutdown(shutdownCtx)
+				cancel()
 				return
 			}
 		}

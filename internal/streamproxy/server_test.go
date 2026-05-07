@@ -345,6 +345,24 @@ func TestShutdownWhenIdleAfterServed(t *testing.T) {
 	}
 }
 
+func TestShutdownWhenIdleBeforeServed(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer(ServerConfig{IdleTimeout: time.Millisecond})
+	httpSrv := &http.Server{} //nolint:gosec // test-only server, never listens.
+	done := make(chan struct{})
+	go func() {
+		srv.shutdownWhenDone(context.Background(), httpSrv)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("shutdown did not observe idle timeout")
+	}
+}
+
 func TestNewHealthToken(t *testing.T) {
 	t.Parallel()
 
