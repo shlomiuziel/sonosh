@@ -8,6 +8,7 @@
 
 ### Fixed
 - `sonos favorites open` now plays container favorites such as service-side albums and playlists by replacing the queue and starting at the first enqueued track. Thanks @bgrgicak.
+- `sonos smapi search|browse --open/--enqueue` now uses SoCo-compatible AppLink queue metadata for generic non-Spotify services such as QQ Music and NetEase Cloud Music. Thanks @huacius.
 
 ### Changed
 - CI now runs coverage with atomic counters, enforces a stricter whole-repo coverage floor, and enforces an 85% coverage floor for the new stream proxy package.
