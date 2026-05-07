@@ -34,6 +34,8 @@ sonos favorites open --name "Kitchen" "Morning Coffee"
 sonos favorites open --name "Kitchen" --index 3
 ```
 
+Tip: for services where direct CLI search/playback is not available, such as YouTube Music, save the album or playlist as a Sonos Favorite in the Sonos app, then open that favorite from `sonoscli`.
+
 ## How it works
 
 - `list` calls `ContentDirectory.Browse(ObjectID=FV:2)` and parses the DIDL-Lite favorites.
