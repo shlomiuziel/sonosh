@@ -183,21 +183,3 @@ func buildShareDIDL(itemID, title, itemClass string, serviceNum int) string {
 		xmlEscapeText(desc),
 	)
 }
-
-func (c *Client) playFromQueueTrack(ctx context.Context, oneBasedTrackNumber int) error {
-	dd, err := c.GetDeviceDescription(ctx)
-	if err != nil {
-		return err
-	}
-	if dd.UDN == "" {
-		return errors.New("missing device UDN")
-	}
-	queueURI := "x-rincon-queue:" + dd.UDN + "#0"
-	if err := c.SetAVTransportURI(ctx, queueURI, ""); err != nil {
-		return err
-	}
-	if err := c.SeekTrackNumber(ctx, oneBasedTrackNumber); err != nil {
-		return err
-	}
-	return c.Play(ctx)
-}

@@ -9,18 +9,20 @@ import (
 )
 
 const (
-	DefaultAddr        = "127.0.0.1:0"
-	DefaultPath        = "/stream.mp3"
-	DefaultFFmpegPath  = "ffmpeg"
-	DefaultYTDLPPath   = "yt-dlp"
-	DefaultBitrate     = "192k"
-	DefaultIdleTimeout = 20 * time.Second
-	HealthPath         = "/healthz"
-	HealthTokenQuery   = "token"
+	DefaultAddr                          = "127.0.0.1:0"
+	DefaultPath                          = "/stream.mp3"
+	DefaultFFmpegPath                    = "ffmpeg"
+	DefaultYTDLPPath                     = "yt-dlp"
+	DefaultBitrate                       = "192k"
+	DefaultIdleTimeout                   = 20 * time.Second
+	DefaultIncompletePlaylistIdleTimeout = 5 * time.Minute
+	HealthPath                           = "/healthz"
+	HealthTokenQuery                     = "token"
 )
 
 type ServerConfig struct {
 	Source      Source
+	Tracks      []Track
 	Addr        string
 	Path        string
 	YTDLPPath   string
@@ -29,6 +31,14 @@ type ServerConfig struct {
 	Bitrate     string
 	IdleTimeout time.Duration
 	HealthToken string
+}
+
+// Track is one item in a multi-track stream proxy. Each track has its own
+// HTTP path on the daemon and its own source. When ServerConfig.Tracks is
+// empty, the daemon serves a single Source at ServerConfig.Path.
+type Track struct {
+	Path   string
+	Source Source
 }
 
 func (cfg ServerConfig) Normalize(ctx context.Context) (ServerConfig, error) {
@@ -63,7 +73,23 @@ func (cfg ServerConfig) withDefaults() ServerConfig {
 	if cfg.IdleTimeout <= 0 {
 		cfg.IdleTimeout = DefaultIdleTimeout
 	}
+	if len(cfg.Tracks) == 0 {
+		cfg.Tracks = []Track{{Path: cfg.Path, Source: cfg.Source}}
+	}
 	return cfg
+}
+
+// MultiTrack reports whether the daemon is serving more than one source.
+func (cfg ServerConfig) MultiTrack() bool {
+	return len(cfg.Tracks) > 1
+}
+
+func (cfg ServerConfig) incompletePlaylistIdleTimeout() time.Duration {
+	timeout := cfg.IdleTimeout * 5
+	if timeout < DefaultIncompletePlaylistIdleTimeout {
+		timeout = DefaultIncompletePlaylistIdleTimeout
+	}
+	return timeout
 }
 
 func NewHealthToken() (string, error) {
