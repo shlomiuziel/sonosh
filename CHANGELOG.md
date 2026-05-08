@@ -2,19 +2,15 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-08
+
 ### Added
 - `sonos play-url` now plays YouTube / YouTube Music playlist URLs in addition to single tracks. A YouTube `?list=…` URL with no video id is auto-detected as a playlist; the command enumerates every item, starts one local stream proxy that exposes one HTTP path per track, and replaces the speaker's queue with the resolved track URLs (clear → `AddURIToQueue` × N → play from track 1). `--playlist` / `--no-playlist` override the auto-detection on ambiguous watch+playlist URLs, and `--playlist` can force other `yt-dlp` playlist pages when `yt-dlp` reports usable item URLs. `--playlist-limit N` caps how many items are enqueued. Thanks @bgrgicak.
-
-### Fixed
-- `sonos play-url` now plays YouTube videos that only expose HLS audio formats (e.g. live/DVR-style or music recordings without progressive `itag 140`). The proxy now pipes `yt-dlp` directly into `ffmpeg` for `yt-dlp` sources, so YouTube's HLS segments are decoded by `yt-dlp`'s `hlsnative` downloader instead of `ffmpeg`'s HLS demuxer (which rejects YouTube's mismatched segment extensions). Thanks @bgrgicak.
-
-## [0.3.0] - 2026-05-07
-
-### Added
 - `sonos play youtube` now resolves YouTube URLs with `yt-dlp` and plays the direct audio stream on Sonos.
 - `sonos play-url` now starts a short-lived local stream proxy for YouTube, podcasts, radio streams, and other URLs, with `Sonos CLI` ICY metadata and automatic idle/EOF exit.
 
 ### Fixed
+- `sonos play-url` now plays YouTube videos that only expose HLS audio formats (e.g. live/DVR-style or music recordings without progressive `itag 140`). The proxy now pipes `yt-dlp` directly into `ffmpeg` for `yt-dlp` sources, so YouTube's HLS segments are decoded by `yt-dlp`'s `hlsnative` downloader instead of `ffmpeg`'s HLS demuxer (which rejects YouTube's mismatched segment extensions). Thanks @bgrgicak.
 - `sonos favorites open` now plays container favorites such as service-side albums and playlists by replacing the queue and starting at the first enqueued track. Thanks @bgrgicak.
 - `sonos smapi search|browse --open/--enqueue` now uses SoCo-compatible AppLink queue metadata for generic non-Spotify services such as QQ Music and NetEase Cloud Music. Thanks @huacius.
 

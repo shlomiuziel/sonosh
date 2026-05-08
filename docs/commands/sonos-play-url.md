@@ -7,6 +7,8 @@ description: Play YouTube, podcast, radio, and other URLs through a short-lived 
 
 Starts a local daemon that turns a URL into a Sonos-safe MP3 stream, points the target room at it, and lets the daemon exit when playback ends or goes idle.
 
+Use this for most web audio. It is more reliable than handing Sonos a temporary media URL directly because your machine resolves the page, downloads the source, and serves Sonos plain MP3 over the local network.
+
 ## Synopsis
 
 ```
@@ -16,12 +18,19 @@ sonos play-url <url> --name "<Room>" [flags]
 ## What It Accepts
 
 - YouTube and other `yt-dlp` supported pages (single track).
+- YouTube videos that only expose HLS audio formats; `yt-dlp` downloads the HLS media and pipes it into `ffmpeg`.
 - YouTube / YouTube Music playlist pages (e.g. `https://music.youtube.com/playlist?list=…`) — auto-detected and every track is enqueued.
 - Other `yt-dlp` playlist pages when forced with `--playlist`, provided `yt-dlp` reports usable item URLs.
 - Direct podcast/audio URLs such as `.mp3`, `.m4a`, `.aac`, `.flac`, `.m3u8`.
 - Radio streams and other URLs that `ffmpeg` can read.
 
 `play-uri` sends an exact URI to Sonos. `play-url` is the smarter compatibility path.
+
+## Requirements
+
+- `ffmpeg` must be installed and available on `PATH`, or passed with `--ffmpeg`.
+- `yt-dlp` must be installed for YouTube, YouTube Music playlists, SoundCloud-style pages, and other media pages, or passed with `--yt-dlp`.
+- The Sonos speaker must be able to reach your machine on the proxy address printed by the command.
 
 ## Playlist Mode
 
@@ -53,13 +62,17 @@ Use `--playlist` to force playlist mode on an ambiguous watch+playlist URL (`?v=
 
 ```bash
 sonos play-url --name "Office" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+sonos play-url --name "Office" "https://music.youtube.com/playlist?list=PL..."
+sonos play-url --name "Office" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
+sonos play-url --name "Office" --playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
+sonos play-url --name "Office" --no-playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
 sonos play-url --name "Office" "https://example.com/podcast/episode.mp3"
 sonos play-url --name "Office" --resolver yt-dlp "https://soundcloud.com/example/track"
 ```
 
 ## Metadata
 
-The daemon serves the stream as `Sonos CLI` and sends ICY metadata with the resolved media title and provider. This usually gives a cleaner Sonos app display than handing Sonos a temporary `googlevideo.com` URL directly.
+For live/single-stream responses where the client requests ICY metadata, the daemon serves the stream as `Sonos CLI` and interleaves the resolved media title and provider. Finite playlist tracks are served as plain MP3 queue items with DIDL metadata so Sonos can advance cleanly from track to track.
 
 ## Lifecycle
 

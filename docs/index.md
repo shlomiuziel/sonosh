@@ -16,6 +16,7 @@ permalink: /
 - **Manage the queue** — list, play a specific entry, remove, clear.
 - **Open Spotify links** without Spotify credentials (uses the Spotify service you already linked in the Sonos app).
 - **Search** linked services via Sonos SMAPI, or Spotify directly via Spotify Web API.
+- **Play web audio** — proxy YouTube, YouTube Music playlists, podcasts, radio streams, and other `yt-dlp` pages through a Sonos-safe local MP3 stream.
 - **Save scenes** — capture grouping + per-room volume/mute and re-apply later.
 - **Watch live events** — subscribe to AVTransport / RenderingControl and stream changes.
 - **Pipe to JSON / TSV** for scripts and dashboards.
@@ -34,6 +35,7 @@ brew install steipete/tap/sonoscli
 sonos discover
 sonos status --name "Kitchen"
 sonos open --name "Kitchen" "https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG"
+sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
 sonos group party --to "Living Room"
 sonos scene save evening
 sonos watch --name "Kitchen"

@@ -10,6 +10,7 @@ Goals:
 
 - Go `1.22+`
 - `golangci-lint` installed (for `make lint` / `pnpm lint`)
+- `ffmpeg` and `yt-dlp` installed for `play-url` checks
 - Sonos speakers reachable on the local network (UDP SSDP + TCP 1400)
 
 ## Quick checks (automated)
@@ -178,7 +179,21 @@ Expected:
 - Categories show at least `tracks`, `albums`, `artists`, `playlists` for Spotify.
 - Search returns results after auth is completed.
 
-### 11) Event watching (manual)
+### 11) URL streaming proxy
+
+Use a room you can interrupt. The command starts a short-lived local daemon and returns after Sonos accepts the stream.
+
+- `sonos play-url --name "<room>" "https://www.youtube.com/watch?v=-n_rdQIVahw"`
+- `sonos play-url --name "<room>" "https://example.com/podcast/episode.mp3"`
+- `sonos play-url --name "<room>" --playlist-limit 2 "https://music.youtube.com/playlist?list=PL..."`
+
+Expected:
+- Single URLs start playback through a local `http://<local-ip>:<port>/Sonos%20CLI.mp3` proxy.
+- YouTube HLS-only videos play through the `yt-dlp` to `ffmpeg` pipeline instead of failing after the command returns.
+- Playlist mode clears the queue, enqueues one local MP3 URL per track, and starts at track 1.
+- The proxy exits after EOF or after the idle timeout when playback is abandoned.
+
+### 12) Event watching (manual)
 
 - `sonos watch --name "<room>" --duration 15s` (or omit `--duration` and Ctrl+C)
 - Change volume / skip track in another controller/app.
@@ -186,7 +201,7 @@ Expected:
 Expected:
 - Events stream in (may take a few seconds after the change); stop with Ctrl+C.
 
-### 12) Shell completions
+### 13) Shell completions
 
 - `sonos completion zsh`
 - `sonos completion bash`

@@ -52,14 +52,18 @@ sonos open --name "Kitchen" spotify:album:0nrRP2bk19rLc0orkWPQk2
 sonos enqueue --name "Kitchen" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M --next
 ```
 
-## 5. Play a URL
+## 5. Play a URL or playlist
 
-For YouTube, podcast links, radio streams, and odd formats, use the local proxy path. It resolves common media pages with `yt-dlp`, transcodes with `ffmpeg`, and exits when playback ends or goes idle:
+For YouTube, YouTube Music playlists, podcast links, radio streams, and odd formats, use the local proxy path. It resolves common media pages with `yt-dlp`, pipes `yt-dlp` sources into `ffmpeg`, transcodes to MP3, and exits when playback ends or goes idle:
 
 ```bash
 sonos play-url --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
+sonos play-url --name "Kitchen" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
 sonos play-url --name "Kitchen" "https://example.com/podcast/episode.mp3"
 ```
+
+Unambiguous YouTube / YouTube Music playlist pages (`?list=…` with no `?v=…`) enqueue every track automatically. Use `--playlist` for ambiguous watch+playlist URLs, or `--no-playlist` when you only want the current video.
 
 ## 6. Group rooms
 

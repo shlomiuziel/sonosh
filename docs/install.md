@@ -36,11 +36,19 @@ Each tagged release publishes archives for macOS (Intel + Apple Silicon), Linux 
 
 ## From source
 
+Use this when you want the current `main` branch before the next release:
+
 ```bash
 git clone https://github.com/steipete/sonoscli
 cd sonoscli
 make build
 ./bin/sonos --version
+```
+
+`sonos play-url` needs `ffmpeg`, and uses `yt-dlp` for YouTube, YouTube Music playlists, SoundCloud-style pages, and other media pages:
+
+```bash
+brew install ffmpeg yt-dlp
 ```
 
 ## Network requirements

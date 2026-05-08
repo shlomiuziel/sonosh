@@ -107,6 +107,9 @@ Key services/actions:
 
 ### Other sources
 
+- `sonos play-url --name "<Room>" "<url>" [--playlist] [--no-playlist] [--playlist-limit N]`
+  - Starts a local daemon that resolves media pages with `yt-dlp` when useful, pipes `yt-dlp` sources into `ffmpeg`, transcodes to MP3, and points Sonos at the local stream.
+  - Unambiguous YouTube / YouTube Music playlist URLs (`?list=…` with no `?v=…`) are enumerated and enqueued track-by-track through one local proxy.
 - `sonos play-uri --name "<Room>" "<uri>" [--title "..."] [--radio]`
 - `sonos linein --name "<Room>" [--from "<RoomWithLineIn>"]`
 - `sonos tv --name "<Room>"`

@@ -15,8 +15,8 @@
   - Enqueue/play Spotify share links or canonical `spotify:<type>:<id>` URIs (no Spotify credentials required).
   - Search Spotify via **SMAPI** (Sonos Music API; uses your linked service in Sonos).
   - Optional Spotify Web API search (client credentials) if you want it.
-- **YouTube handoff**: resolve a YouTube URL with `yt-dlp` and play the direct audio stream on Sonos.
-- **Smart URL streaming**: `play-url` runs a short-lived local proxy for YouTube, podcasts, radio streams, and other URLs.
+- **YouTube handoff**: resolve a YouTube URL with `yt-dlp` and hand the direct audio stream to Sonos.
+- **Smart URL streaming**: `play-url` runs a short-lived local MP3 proxy for YouTube, YouTube Music playlists, podcasts, radio streams, SoundCloud-style pages, and other URLs.
 - **Live events**: `watch` subscribes to AVTransport + RenderingControl and prints changes.
 - **Scriptable output**: `--format plain|json|tsv` plus `--debug` tracing.
 
@@ -42,10 +42,12 @@ Spotify search via Spotify Web API (optional):
 YouTube:
 - Install `yt-dlp` if you want `sonos play youtube`.
 - Sonos plays the resolved temporary audio stream directly; long videos may expire and need resolving again.
+- For most YouTube playback, prefer `sonos play-url`: it proxies the stream through your machine, transcodes to MP3, and avoids Sonos having to fetch YouTube's temporary media URL itself.
 
 Smart URL streaming:
 - Install `yt-dlp` and `ffmpeg` for `sonos play-url`.
-- `play-url` resolves common media pages, transcodes to a local MP3 stream, sends `Sonos CLI` stream metadata, and exits the proxy when playback ends or goes idle.
+- `play-url` resolves common media pages, pipes `yt-dlp` sources into `ffmpeg`, transcodes to a local MP3 stream, sends `Sonos CLI` stream metadata, and exits the proxy when playback ends or goes idle.
+- Unambiguous YouTube / YouTube Music playlist URLs (`?list=…` without `?v=…`) are auto-detected and enqueued track-by-track. Use `--playlist`, `--no-playlist`, and `--playlist-limit` to control playlist handling.
 
 ## Install / build
 
@@ -208,6 +210,8 @@ Play a URL through the Sonos-safe local proxy (requires `ffmpeg`; `yt-dlp` for Y
 
 ```bash
 ./sonos play-url --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+./sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
+./sonos play-url --name "Kitchen" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
 ./sonos play-url --name "Kitchen" "https://example.com/podcast/episode.mp3"
 ```
 

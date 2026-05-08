@@ -14,6 +14,7 @@ cmd/sonos/                 # main entrypoint (just calls into internal/cli)
 internal/cli/              # Cobra commands, flag plumbing, output formatting
 internal/sonos/            # SOAP client, SSDP, topology, AVTransport, ContentDirectory, RenderingControl
 internal/spotify/          # Optional Spotify Web API client (client credentials only)
+internal/streamproxy/      # Short-lived local MP3 proxy for play-url
 internal/scenes/           # Scene save/apply (grouping + per-room volume/mute)
 internal/appconfig/        # Local config file (~/.config/sonoscli/config.json)
 ```
@@ -54,6 +55,19 @@ Only the actions actually needed by the CLI are wired up. Adding a new action is
 ## Eventing
 
 `sonos watch` uses UPnP eventing (GENA): it starts a small HTTP server, sends `SUBSCRIBE` requests for `AVTransport` and `RenderingControl`, and re-renders state changes as they stream in. The callback URL must be reachable from the speaker, which is why your firewall may prompt on first run.
+
+## Stream proxy
+
+`sonos play-url` starts a detached local daemon for web audio. The foreground command resolves the target speaker, chooses a LAN-reachable local IP, writes a one-shot proxy config, waits for a tokenized health check, then points Sonos at the generated `http://<local-ip>:<port>/...mp3` URL.
+
+The daemon keeps Sonos on a simple MP3 stream while your machine handles the messy side:
+
+- direct media URLs go through `ffmpeg`;
+- YouTube and other media pages use `yt-dlp` when needed;
+- HLS-only YouTube formats are downloaded by `yt-dlp` and piped into `ffmpeg`;
+- YouTube / YouTube Music playlists expose one local MP3 path per track, then queue those paths with Sonos metadata.
+
+The proxy exits after EOF or an idle timeout, so normal `play-url` usage does not leave a permanent server behind.
 
 ## Output
 
