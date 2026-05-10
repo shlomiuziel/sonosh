@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-10
+
 ### Added
 - `sonos config set defaultTimeout <duration>` now persists the default discovery/network timeout. Snake-case aliases (`default_timeout`, `default_room`) are accepted for config keys.
 
