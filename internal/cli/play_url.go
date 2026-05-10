@@ -134,7 +134,7 @@ func newPlayURLCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			meta := sonos.BuildStreamProxyMeta("Sonos CLI", src.DisplayProvider())
+			meta := sonos.BuildStreamProxyMeta(src.DisplayTitle(), src.DisplayProvider())
 			uri := publicURL
 			if err := target.client.SetAVTransportURI(cmd.Context(), uri, meta); err != nil {
 				return err

@@ -17,6 +17,20 @@ func TestDefaultHTTPClientDisablesKeepAlives(t *testing.T) {
 	}
 }
 
+func TestDefaultHTTPClientUsesDefaultTimeout(t *testing.T) {
+	c := defaultHTTPClient(0)
+	if c.Timeout != DefaultTimeout {
+		t.Fatalf("timeout = %s, want %s", c.Timeout, DefaultTimeout)
+	}
+	tr, ok := c.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected *http.Transport, got %T", c.Transport)
+	}
+	if tr.TLSHandshakeTimeout != DefaultTimeout {
+		t.Fatalf("TLSHandshakeTimeout = %s, want %s", tr.TLSHandshakeTimeout, DefaultTimeout)
+	}
+}
+
 func TestDefaultHTTPClientBypassesProxyForPrivateIPs(t *testing.T) {
 	t.Setenv("HTTP_PROXY", "http://proxy.example:8080")
 	t.Setenv("http_proxy", "http://proxy.example:8080")

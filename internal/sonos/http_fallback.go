@@ -55,7 +55,7 @@ func fallbackTimeout(ctx context.Context, clientTimeout time.Duration) time.Dura
 		}
 	}
 	if timeout <= 0 {
-		timeout = 5 * time.Second
+		timeout = DefaultTimeout
 	}
 	return timeout
 }

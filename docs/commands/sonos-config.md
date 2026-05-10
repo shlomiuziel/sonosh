@@ -27,7 +27,7 @@ sonos config path
 
 ```bash
 sonos config get                      # everything
-sonos config get default_room         # one key
+sonos config get defaultRoom          # one key
 sonos config get --format json
 ```
 
@@ -35,11 +35,12 @@ sonos config get --format json
 
 ```bash
 sonos config set default_room "Kitchen"
-sonos config set default_timeout 10s
+sonos config set defaultTimeout 10s
 sonos config unset default_room
 ```
 
 ## Notes
 
 - The file is intentionally small — please go through `sonos config` to write it; the schema is allowed to evolve.
+- Supported keys: `defaultRoom`, `defaultTimeout`, `format`. Snake_case aliases are accepted for `default_room` and `default_timeout`.
 - Sensitive items (e.g. SMAPI tokens) are stored separately from this file.

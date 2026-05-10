@@ -56,6 +56,12 @@ func newRootCmd() (*cobra.Command, *rootFlags, error) {
 		return nil, nil, err
 	}
 	cfg = cfg.Normalize()
+	timeout := sonos.DefaultTimeout
+	if cfg.DefaultTimeout != "" {
+		if d, err := time.ParseDuration(cfg.DefaultTimeout); err == nil && d > 0 {
+			timeout = d
+		}
+	}
 
 	rootCmd := &cobra.Command{
 		Use:          "sonos",
@@ -90,7 +96,7 @@ func newRootCmd() (*cobra.Command, *rootFlags, error) {
 
 	rootCmd.PersistentFlags().StringVar(&flags.IP, "ip", "", "Target speaker IP address")
 	rootCmd.PersistentFlags().StringVar(&flags.Name, "name", cfg.DefaultRoom, "Target speaker name")
-	rootCmd.PersistentFlags().DurationVar(&flags.Timeout, "timeout", 5*time.Second, "Timeout for discovery and network calls")
+	rootCmd.PersistentFlags().DurationVar(&flags.Timeout, "timeout", timeout, "Timeout for discovery and network calls")
 	rootCmd.PersistentFlags().StringVar(&flags.Format, "format", cfg.Format, "Output format: plain|json|tsv")
 	rootCmd.PersistentFlags().BoolVar(&flags.JSON, "json", false, "Deprecated: use --format json")
 	_ = rootCmd.PersistentFlags().MarkDeprecated("json", "use --format json")

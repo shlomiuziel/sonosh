@@ -147,7 +147,7 @@ func runPlayURLPlaylist(cmd *cobra.Command, flags *rootFlags, rawURL string, opt
 
 	// Sonos AddURIToQueue probes each enqueued URI (HEAD, sometimes a short
 	// GET) before returning. With long playlists and the proxy on the same
-	// LAN this comfortably outruns the default 5 s --timeout, especially
+	// LAN this comfortably outruns the default 15 s --timeout, especially
 	// when the speaker is also pre-fetching audio for the currently playing
 	// track. Use a per-operation timeout that covers the whole queue
 	// build-out independently of --timeout.

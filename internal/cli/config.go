@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/steipete/sonoscli/internal/appconfig"
@@ -139,8 +140,9 @@ func newConfigUnsetCmd(flags *rootFlags) *cobra.Command {
 
 func printConfigPlain(cmd *cobra.Command, cfg appconfig.Config) {
 	entries := map[string]string{
-		"defaultRoom": cfg.DefaultRoom,
-		"format":      cfg.Format,
+		"defaultRoom":    cfg.DefaultRoom,
+		"defaultTimeout": cfg.DefaultTimeout,
+		"format":         cfg.Format,
 	}
 	keys := make([]string, 0, len(entries))
 	for k := range entries {
@@ -153,9 +155,11 @@ func printConfigPlain(cmd *cobra.Command, cfg appconfig.Config) {
 }
 
 func getConfigKey(cfg appconfig.Config, key string) (string, bool) {
-	switch key {
+	switch canonicalConfigKey(key) {
 	case "defaultRoom":
 		return cfg.DefaultRoom, true
+	case "defaultTimeout":
+		return cfg.DefaultTimeout, true
 	case "format":
 		return cfg.Format, true
 	default:
@@ -164,9 +168,16 @@ func getConfigKey(cfg appconfig.Config, key string) (string, bool) {
 }
 
 func setConfigKey(cfg appconfig.Config, key, value string) (appconfig.Config, error) {
-	switch key {
+	switch canonicalConfigKey(key) {
 	case "defaultRoom":
 		cfg.DefaultRoom = value
+		return cfg, nil
+	case "defaultTimeout":
+		d, err := time.ParseDuration(strings.TrimSpace(value))
+		if err != nil || d <= 0 {
+			return appconfig.Config{}, errors.New("invalid defaultTimeout (expected positive duration like 15s): " + value)
+		}
+		cfg.DefaultTimeout = d.String()
 		return cfg, nil
 	case "format":
 		value = strings.TrimSpace(value)
@@ -183,14 +194,28 @@ func setConfigKey(cfg appconfig.Config, key, value string) (appconfig.Config, er
 }
 
 func unsetConfigKey(cfg appconfig.Config, key string) (appconfig.Config, error) {
-	switch key {
+	switch canonicalConfigKey(key) {
 	case "defaultRoom":
 		cfg.DefaultRoom = ""
+		return cfg, nil
+	case "defaultTimeout":
+		cfg.DefaultTimeout = ""
 		return cfg, nil
 	case "format":
 		cfg.Format = ""
 		return cfg, nil
 	default:
 		return appconfig.Config{}, errors.New("unknown key: " + key)
+	}
+}
+
+func canonicalConfigKey(key string) string {
+	switch strings.TrimSpace(key) {
+	case "default_room":
+		return "defaultRoom"
+	case "default_timeout":
+		return "defaultTimeout"
+	default:
+		return strings.TrimSpace(key)
 	}
 }

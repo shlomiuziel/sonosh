@@ -65,6 +65,6 @@ The cache lives next to the config file. If anything looks stale, just run `sono
 ## Tips for flaky networks
 
 - Pin the IP: `sonos status --ip 10.0.0.42` skips discovery entirely.
-- Increase the timeout: `--timeout 10s` helps on slow Wi-Fi.
+- Default discovery waits up to 15 seconds. Use a higher `--timeout` on especially slow Wi-Fi, or `sonos config set defaultTimeout 20s` to make it sticky.
 - Make sure your machine and your Sonos are on the same VLAN — Sonos does not route across L3 boundaries by default.
 - For UPnP eventing (`sonos watch`), your machine must be reachable from the speaker on the chosen callback port; firewall prompts are expected.

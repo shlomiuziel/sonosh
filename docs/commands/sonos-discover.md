@@ -10,7 +10,7 @@ Sends an SSDP M-SEARCH query, then asks the first responder for the full zone to
 ## Synopsis
 
 ```
-sonos discover [--all] [--format plain|json|tsv] [--timeout 5s]
+sonos discover [--all] [--format plain|json|tsv] [--timeout 15s]
 ```
 
 ## Flags

@@ -7,17 +7,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Config struct {
-	DefaultRoom string `json:"defaultRoom,omitempty"`
-	Format      string `json:"format,omitempty"`
+	DefaultRoom    string `json:"defaultRoom,omitempty"`
+	DefaultTimeout string `json:"defaultTimeout,omitempty"`
+	Format         string `json:"format,omitempty"`
 }
 
 func (c Config) Normalize() Config {
 	out := Config{
-		DefaultRoom: strings.TrimSpace(c.DefaultRoom),
-		Format:      strings.ToLower(strings.TrimSpace(c.Format)),
+		DefaultRoom:    strings.TrimSpace(c.DefaultRoom),
+		DefaultTimeout: normalizeDuration(c.DefaultTimeout),
+		Format:         strings.ToLower(strings.TrimSpace(c.Format)),
 	}
 	if out.Format == "" {
 		out.Format = "plain"
@@ -26,6 +29,18 @@ func (c Config) Normalize() Config {
 		out.Format = "plain"
 	}
 	return out
+}
+
+func normalizeDuration(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil || d <= 0 {
+		return ""
+	}
+	return d.String()
 }
 
 func isValidFormat(format string) bool {

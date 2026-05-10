@@ -423,7 +423,7 @@ CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
 
 - `--ip <ip>`: target by IP
 - `--name <name>`: target by speaker name (defaults to `sonos config defaultRoom` if set)
-- `--timeout <duration>`: discovery/network timeout (default `5s`)
+- `--timeout <duration>`: discovery/network timeout (default `15s`, configurable with `sonos config set defaultTimeout 10s`)
 - `--format plain|json|tsv`: output format (defaults to `sonos config format` if set)
 - `--json`: deprecated alias for `--format json`
 - `--debug`: enable detailed trace logs (SSDP/topology/SOAP timings)
@@ -435,6 +435,7 @@ Persist small local defaults:
 ```bash
 ./sonos config get
 ./sonos config set defaultRoom "Office"
+./sonos config set defaultTimeout 10s
 ./sonos config set format json
 ./sonos config unset defaultRoom
 ```

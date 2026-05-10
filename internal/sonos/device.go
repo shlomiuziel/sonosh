@@ -70,6 +70,10 @@ func fetchDeviceDescription(ctx context.Context, httpClient *http.Client, locati
 }
 
 func defaultHTTPClient(timeout time.Duration) *http.Client {
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+
 	dialer := &net.Dialer{
 		Timeout: timeout,
 	}

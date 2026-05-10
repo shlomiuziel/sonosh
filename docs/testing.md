@@ -33,7 +33,7 @@ Expected:
 
 Notes:
 - Some tests change grouping and playback. Prefer using a “test room” (e.g. `Office`).
-- Use `--timeout 10s` if your network is slow.
+- Default timeout is 15s. Use a higher `--timeout` if your network is very slow.
 
 ### 1) CLI basics
 

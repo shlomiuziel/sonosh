@@ -35,7 +35,7 @@ var (
 func Discover(ctx context.Context, opts DiscoverOptions) ([]Device, error) {
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = 5 * time.Second
+		timeout = DefaultTimeout
 	}
 
 	slog.Debug("discover: start", "timeout", timeout.String(), "includeInvisible", opts.IncludeInvisible)

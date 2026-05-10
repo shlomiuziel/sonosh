@@ -53,7 +53,7 @@ sonos status --ip 10.0.0.42
 sonos status --name "Kitchen" --timeout 10s
 ```
 
-The default is 5 seconds, which is fine on healthy networks. Bump it on flaky Wi-Fi.
+The default is 15 seconds, which is friendlier to slow Wi-Fi and sleepy speakers. Use a shorter value for scripts that should fail fast, or bump it higher on especially flaky networks.
 
 ## Debug tracing
 

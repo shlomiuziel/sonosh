@@ -14,7 +14,7 @@ Global flags apply to every command:
 | `--name string` | — | Target speaker by name (matched against topology). |
 | `--ip string` | — | Target speaker by IP — skips discovery. |
 | `--format string` | `plain` | Output format: `plain`, `json`, or `tsv`. |
-| `--timeout duration` | `5s` | Discovery and per-call timeout. |
+| `--timeout duration` | `15s` | Discovery and per-call timeout. |
 | `--debug` | off | Print SOAP traces to stderr. |
 
 ## Discovery & status

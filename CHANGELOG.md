@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- `sonos config set defaultTimeout <duration>` now persists the default discovery/network timeout. Snake-case aliases (`default_timeout`, `default_room`) are accepted for config keys.
+
+### Changed
+- The default discovery/network timeout is now 15 seconds, making room discovery more reliable on slower Wi-Fi and sleepy speakers.
+- `sonos play-url` now sends the resolved source title in Sonos metadata instead of always showing `Sonos CLI`.
+
 ## [0.3.0] - 2026-05-08
 
 ### Added

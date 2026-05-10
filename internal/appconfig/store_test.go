@@ -16,7 +16,7 @@ func TestFileStore_SaveLoad(t *testing.T) {
 		t.Fatalf("NewFileStore: %v", err)
 	}
 
-	cfg := Config{DefaultRoom: " Office ", Format: "JSON"}
+	cfg := Config{DefaultRoom: " Office ", DefaultTimeout: "15000ms", Format: "JSON"}
 	if err := s.Save(cfg); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -31,6 +31,9 @@ func TestFileStore_SaveLoad(t *testing.T) {
 	if got.Format != "json" {
 		t.Fatalf("format: %q", got.Format)
 	}
+	if got.DefaultTimeout != "15s" {
+		t.Fatalf("defaultTimeout: %q", got.DefaultTimeout)
+	}
 
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -38,6 +41,18 @@ func TestFileStore_SaveLoad(t *testing.T) {
 	}
 	if fi.Mode().Perm() != 0o600 {
 		t.Fatalf("expected perms 0600, got %o", fi.Mode().Perm())
+	}
+}
+
+func TestConfigNormalize_InvalidDefaultTimeout(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"nope", "0s", "-1s"} {
+		cfg := Config{DefaultTimeout: value}
+		got := cfg.Normalize()
+		if got.DefaultTimeout != "" {
+			t.Fatalf("DefaultTimeout for %q = %q, want empty", value, got.DefaultTimeout)
+		}
 	}
 }
 

@@ -84,6 +84,41 @@ func TestDiscoverFallsBackWhenSSDPDeadlineExceeded(t *testing.T) {
 	}
 }
 
+func TestDiscoverUsesDefaultTimeout(t *testing.T) {
+	origSSDP := ssdpDiscoverFunc
+	origScan := scanAnySpeakerIPFunc
+	origTop := discoverViaTopologyFunc
+	t.Cleanup(func() {
+		ssdpDiscoverFunc = origSSDP
+		scanAnySpeakerIPFunc = origScan
+		discoverViaTopologyFunc = origTop
+	})
+
+	ssdpDiscoverFunc = func(ctx context.Context, timeout time.Duration) ([]ssdpResult, error) {
+		return []ssdpResult{{Location: "http://192.168.1.10:1400/xml/device_description.xml"}}, nil
+	}
+	scanAnySpeakerIPFunc = func(ctx context.Context, timeout time.Duration) (string, error) {
+		t.Fatalf("unexpected scan fallback")
+		return "", nil
+	}
+	var got time.Duration
+	discoverViaTopologyFunc = func(ctx context.Context, timeout time.Duration, results []ssdpResult, includeInvisible bool) ([]Device, error) {
+		got = timeout
+		return []Device{{IP: "192.168.1.10", Name: "Office", UDN: "RINCON_x"}}, nil
+	}
+
+	devs, err := Discover(context.Background(), DiscoverOptions{})
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	if got != DefaultTimeout {
+		t.Fatalf("timeout = %s, want %s", got, DefaultTimeout)
+	}
+	if len(devs) != 1 || devs[0].Name != "Office" {
+		t.Fatalf("unexpected devices: %#v", devs)
+	}
+}
+
 func TestSortDevices(t *testing.T) {
 	in := map[string]Device{
 		"2.2.2.2": {IP: "2.2.2.2", Name: "B"},

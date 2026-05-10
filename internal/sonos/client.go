@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// DefaultTimeout is the default timeout for discovery and speaker network calls.
+const DefaultTimeout = 15 * time.Second
+
 type Client struct {
 	IP   string
 	Port int

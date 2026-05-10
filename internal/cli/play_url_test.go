@@ -62,8 +62,8 @@ func TestPlayURLCmdStartsDaemonAndPlaysProxy(t *testing.T) {
 	if fake.uri != "http://192.168.0.25:8877/Sonos%20CLI.mp3" {
 		t.Fatalf("unexpected proxy URI: %q", fake.uri)
 	}
-	if !strings.Contains(fake.meta, "Sonos CLI") {
-		t.Fatalf("expected Sonos CLI metadata, got %q", fake.meta)
+	if !strings.Contains(fake.meta, "episode.mp3") {
+		t.Fatalf("expected source title metadata, got %q", fake.meta)
 	}
 	if fake.playCalls != 1 {
 		t.Fatalf("expected play once, got %d", fake.playCalls)
