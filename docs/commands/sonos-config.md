@@ -5,7 +5,7 @@ description: Read and write small local defaults stored under your user config d
 
 # `sonos config`
 
-`sonoscli` keeps a small JSON file with local defaults — typical example: a default room name so you don't have to pass `--name` every time.
+`sonoscli` keeps a small JSON file with local defaults: a default room name, preferred output format, and default discovery/network timeout.
 
 ```
 sonos config get  [key]
@@ -34,13 +34,21 @@ sonos config get --format json
 ## Writing
 
 ```bash
-sonos config set default_room "Kitchen"
+sonos config set defaultRoom "Kitchen"
 sonos config set defaultTimeout 10s
-sonos config unset default_room
+sonos config set format json
+sonos config unset defaultRoom
 ```
+
+## Keys
+
+- `defaultRoom`: room used when `--name` / `--ip` is omitted.
+- `defaultTimeout`: discovery/network timeout used when `--timeout` is omitted. Built-in default: `15s`.
+- `format`: output format used when `--format` is omitted (`plain`, `json`, or `tsv`).
+
+Snake-case aliases are accepted for compatibility: `default_room`, `default_timeout`.
 
 ## Notes
 
 - The file is intentionally small — please go through `sonos config` to write it; the schema is allowed to evolve.
-- Supported keys: `defaultRoom`, `defaultTimeout`, `format`. Snake_case aliases are accepted for `default_room` and `default_timeout`.
 - Sensitive items (e.g. SMAPI tokens) are stored separately from this file.

@@ -72,7 +72,7 @@ sonos play-url --name "Office" --resolver yt-dlp "https://soundcloud.com/example
 
 ## Metadata
 
-For live/single-stream responses where the client requests ICY metadata, the daemon serves the stream as `Sonos CLI` and interleaves the resolved media title and provider. Finite playlist tracks are served as plain MP3 queue items with DIDL metadata so Sonos can advance cleanly from track to track.
+For single-stream playback, `sonoscli` sends the resolved title/provider as Sonos DIDL metadata, so status and the Sonos app can show the actual media title instead of a generic proxy name. If the speaker requests ICY metadata, the daemon also interleaves the resolved media title and provider while the MP3 stream is served. Finite playlist tracks are served as plain MP3 queue items with DIDL metadata so Sonos can advance cleanly from track to track.
 
 ## Lifecycle
 

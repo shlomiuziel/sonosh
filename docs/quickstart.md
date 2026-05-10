@@ -21,6 +21,17 @@ sonos discover --format json
 
 The first run also caches speaker names so `--name <Tab>` autocompletes.
 
+## Optional: Set Local Defaults
+
+If you usually target one room, make commands shorter:
+
+```bash
+sonos config set defaultRoom "Kitchen"
+sonos config set defaultTimeout 15s
+```
+
+`defaultTimeout` changes the fallback used by discovery and speaker calls when `--timeout` is omitted. The built-in default is `15s`.
+
 ## 2. Check what's playing
 
 ```bash
@@ -54,7 +65,7 @@ sonos enqueue --name "Kitchen" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M --next
 
 ## 5. Play a URL or playlist
 
-For YouTube, YouTube Music playlists, podcast links, radio streams, and odd formats, use the local proxy path. It resolves common media pages with `yt-dlp`, pipes `yt-dlp` sources into `ffmpeg`, transcodes to MP3, and exits when playback ends or goes idle:
+For YouTube, YouTube Music playlists, podcast links, radio streams, and odd formats, use the local proxy path. It resolves common media pages with `yt-dlp`, pipes `yt-dlp` sources into `ffmpeg`, transcodes to MP3, sends the resolved title/provider to Sonos metadata, and exits when playback ends or goes idle:
 
 ```bash
 sonos play-url --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"

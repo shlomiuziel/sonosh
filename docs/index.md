@@ -33,6 +33,8 @@ This is not an official Sonos project.
 brew install steipete/tap/sonoscli
 
 sonos discover
+sonos config set defaultRoom "Kitchen"
+sonos config set defaultTimeout 15s
 sonos status --name "Kitchen"
 sonos open --name "Kitchen" "https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG"
 sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."

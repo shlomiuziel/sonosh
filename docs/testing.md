@@ -67,6 +67,8 @@ Regression checks:
 - `sonos config path` prints where config is stored
 - `sonos config set defaultRoom "Office"` then run a command without `--name`/`--ip`:
   - `sonos volume get` (should target the default room)
+- `sonos config set defaultTimeout 10s`, then `sonos --help` should show `--timeout ... (default 10s)`
+- `sonos config unset defaultTimeout`, then `sonos --help` should show `--timeout ... (default 15s)`
 - `sonos config unset defaultRoom` then run `sonos volume get` (should error and ask for `--name/--ip`)
 
 

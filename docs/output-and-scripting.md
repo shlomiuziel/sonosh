@@ -55,6 +55,12 @@ sonos status --name "Kitchen" --timeout 10s
 
 The default is 15 seconds, which is friendlier to slow Wi-Fi and sleepy speakers. Use a shorter value for scripts that should fail fast, or bump it higher on especially flaky networks.
 
+To make a timeout sticky:
+
+```bash
+sonos config set defaultTimeout 20s
+```
+
 ## Debug tracing
 
 ```bash

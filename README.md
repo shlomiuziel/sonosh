@@ -46,7 +46,7 @@ YouTube:
 
 Smart URL streaming:
 - Install `yt-dlp` and `ffmpeg` for `sonos play-url`.
-- `play-url` resolves common media pages, pipes `yt-dlp` sources into `ffmpeg`, transcodes to a local MP3 stream, sends `Sonos CLI` stream metadata, and exits the proxy when playback ends or goes idle.
+- `play-url` resolves common media pages, pipes `yt-dlp` sources into `ffmpeg`, transcodes to a local MP3 stream, sends the resolved title/provider to Sonos metadata, and exits the proxy when playback ends or goes idle.
 - Unambiguous YouTube / YouTube Music playlist URLs (`?list=…` without `?v=…`) are auto-detected and enqueued track-by-track. Use `--playlist`, `--no-playlist`, and `--playlist-limit` to control playlist handling.
 
 ## Install / build
@@ -430,7 +430,7 @@ CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
 
 ## Config (defaults)
 
-Persist small local defaults:
+Persist small local defaults so repeated commands stay terse:
 
 ```bash
 ./sonos config get
@@ -440,12 +440,21 @@ Persist small local defaults:
 ./sonos config unset defaultRoom
 ```
 
+Supported keys:
+
+- `defaultRoom`: room used when `--name` / `--ip` is omitted.
+- `defaultTimeout`: discovery/network timeout used when `--timeout` is omitted. The built-in default is `15s`.
+- `format`: default output format (`plain`, `json`, or `tsv`).
+
+Snake-case aliases (`default_room`, `default_timeout`) are accepted too.
+
 ## Troubleshooting
 
 - `discover` is empty:
   - Some networks block multicast/SSDP; `sonoscli` falls back to scanning local /24 subnets for port `1400` and then uses Sonos topology to list all rooms.
   - Ensure Wi‑Fi client isolation is off and you’re on the same LAN/subnet.
 - Discovery is slow or flaky:
+  - The default timeout is `15s`. Use `sonos config set defaultTimeout 20s` to make a longer timeout sticky, or pass `--timeout 5s` in scripts that should fail fast.
   - Run `sonos --debug discover` to see whether SSDP multicast is timing out and whether topology calls are slow.
 - Discovery / SOAP calls hang or time out on your network:
   - `sonoscli` retries local Sonos HTTP/SOAP calls via `curl` as a workaround for some network/firmware quirks.
