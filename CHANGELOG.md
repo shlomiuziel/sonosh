@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Docker: add a local image with bundled `ffmpeg`, `yt-dlp`, and CI smoke coverage.
+
 ## [0.3.1] - 2026-05-10
 
 ### Added

@@ -1,0 +1,28 @@
+name: docker
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build image
+        run: docker build --pull -t sonoscli:ci .
+
+      - name: Smoke test image
+        run: |
+          set -euo pipefail
+          docker run --rm sonoscli:ci --version
+          docker run --rm sonoscli:ci --help
+          docker run --rm --entrypoint ffmpeg sonoscli:ci -version
+          docker run --rm --entrypoint yt-dlp sonoscli:ci --version
+          docker run --rm --entrypoint curl sonoscli:ci --version

@@ -80,6 +80,15 @@ go build -o sonos ./cmd/sonos
 ./sonos --help
 ```
 
+Docker:
+
+```bash
+docker build -t sonoscli .
+docker run --rm --network host -v "$PWD/.sonoscli:/data" sonoscli discover
+```
+
+Linux containers need `--network host` for SSDP/UPnP discovery. The image includes `ffmpeg`, `yt-dlp`, and `curl`.
+
 ## Quick start
 
 Note: if you installed via Homebrew or `go install`, replace `./sonos` with `sonos`.
