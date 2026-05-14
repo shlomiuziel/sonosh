@@ -16,6 +16,7 @@ import (
 
 func TestWatchCmd_TSVAndMethodNotAllowed(t *testing.T) {
 	callbackCh := make(chan string, 1)
+	subscribedCh := make(chan struct{}, 1)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -36,6 +37,10 @@ func TestWatchCmd_TSVAndMethodNotAllowed(t *testing.T) {
 			w.Header().Set("SID", "uuid:rc")
 			w.Header().Set("TIMEOUT", "Second-1800")
 			w.WriteHeader(http.StatusOK)
+			select {
+			case subscribedCh <- struct{}{}:
+			default:
+			}
 			return
 		case r.Method == "UNSUBSCRIBE":
 			w.WriteHeader(http.StatusOK)
@@ -75,6 +80,11 @@ func TestWatchCmd_TSVAndMethodNotAllowed(t *testing.T) {
 	case callbackURL = <-callbackCh:
 	case <-time.After(1 * time.Second):
 		t.Fatalf("timed out waiting for callback")
+	}
+	select {
+	case <-subscribedCh:
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timed out waiting for subscriptions")
 	}
 
 	// Ensure non-NOTIFY methods are rejected.
@@ -119,8 +129,18 @@ func TestWatchCmd_TSVAndMethodNotAllowed(t *testing.T) {
 	}
 
 	got := out.String()
-	if !strings.Contains(got, "\tavtransport\tuuid:avt\ttransport_state\tPLAYING") {
+	fields := strings.Split(strings.TrimSpace(got), "\t")
+	if len(fields) != 5 {
 		t.Fatalf("unexpected tsv output: %q", got)
+	}
+	if _, err := time.Parse(time.RFC3339Nano, fields[0]); err != nil {
+		t.Fatalf("unexpected tsv timestamp %q: %v", fields[0], err)
+	}
+	want := []string{"avtransport", "uuid:avt", "transport_state", "PLAYING"}
+	for i, field := range fields[1:] {
+		if field != want[i] {
+			t.Fatalf("unexpected tsv output: %q", got)
+		}
 	}
 }
 
