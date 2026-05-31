@@ -60,7 +60,7 @@ jobs:
           {
             echo "RELEASE_TAG=${release_tag}"
             echo "RELEASE_VERSION=${release_version}"
-            echo "MACOS_ARTIFACT=sonoscli_${release_version}_darwin_arm64.tar.gz"
+            echo "ARTIFACT_TEMPLATE=sonoscli_${release_version}_{target}.tar.gz"
           } >> "${GITHUB_ENV}"
 
       - name: Dispatch tap formula update
@@ -81,7 +81,7 @@ jobs:
             -f formula=sonoscli \
             -f tag="${RELEASE_TAG}" \
             -f repository=steipete/sonoscli \
-            -f macos_artifact="${MACOS_ARTIFACT}" \
+            -f artifact_template="${ARTIFACT_TEMPLATE}" \
             -f request_id="${request_id}"
 
           run_id=""
