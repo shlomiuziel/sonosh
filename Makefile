@@ -28,8 +28,11 @@ build:
 
 build-darwin:
 	mkdir -p bin
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o bin/sonos-darwin-amd64 ./cmd/sonos
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o bin/sonos-darwin-arm64 ./cmd/sonos
+	tmp="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o "$$tmp/sonos-darwin-amd64" ./cmd/sonos; \
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o "$$tmp/sonos-darwin-arm64" ./cmd/sonos; \
+	lipo -create -output bin/sonos-darwin-universal "$$tmp/sonos-darwin-amd64" "$$tmp/sonos-darwin-arm64"
 
 lint:
 	golangci-lint run ./...
