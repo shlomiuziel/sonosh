@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check lint test race coverage build ci docs-site
+.PHONY: fmt fmt-check lint test race coverage build build-darwin ci docs-site
 
 fmt:
 	gofmt -w .
@@ -25,6 +25,14 @@ coverage:
 build:
 	mkdir -p bin
 	go build -o bin/sonos ./cmd/sonos
+
+build-darwin:
+	mkdir -p bin
+	tmp="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o "$$tmp/sonos-darwin-amd64" ./cmd/sonos; \
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o "$$tmp/sonos-darwin-arm64" ./cmd/sonos; \
+	lipo -create -output bin/sonos-darwin-universal "$$tmp/sonos-darwin-amd64" "$$tmp/sonos-darwin-arm64"
 
 lint:
 	golangci-lint run ./...
