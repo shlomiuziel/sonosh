@@ -24,16 +24,18 @@ universal_binaries:
     ids:
       - sonos
     name_template: sonos
-    replace: true
+    replace: false
 
 archives:
-  - builds:
+  - ids:
       - sonos
-    format: tar.gz
-    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macos-universal{{ else }}{{ .Os }}_{{ .Arch }}{{ end }}'
+    formats:
+      - tar.gz
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if and (eq .Os "darwin") (eq .Arch "all") }}macos-universal{{ else }}{{ .Os }}_{{ .Arch }}{{ end }}'
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: checksums.txt

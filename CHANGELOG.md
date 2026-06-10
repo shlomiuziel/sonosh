@@ -4,6 +4,7 @@
 
 ### Added
 - Docker: add a local image with bundled `ffmpeg`, `yt-dlp`, and CI smoke coverage.
+- Release archives now include a macOS universal binary while preserving the legacy `darwin_amd64` and `darwin_arm64` asset names. Thanks @streeter.
 
 ## [0.3.1] - 2026-05-10
 
