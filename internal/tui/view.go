@@ -63,7 +63,6 @@ var (
 			Padding(0, 1)
 
 	coverStyle = lipgloss.NewStyle().
-			Align(lipgloss.Center).
 			Border(lipgloss.ThickBorder()).
 			BorderForeground(colorAccent2).
 			Foreground(colorInk).
@@ -223,22 +222,68 @@ func (m Model) renderRightPane(width int) string {
 
 func (m Model) renderCover(width int) string {
 	contentWidth := max(1, width-borderChrome)
+	innerWidth := max(1, contentWidth-coverStyle.GetHorizontalPadding())
 	title := empty(m.status.Title, "No Track")
 	artist := empty(m.status.Artist, "sonosh")
 	initials := coverInitials(title, artist)
-	albumLine := truncate(empty(m.status.Album, "Sonos"), max(8, contentWidth-4))
-	artHint := ""
-	if m.status.AlbumArt != "" {
-		artHint = "\n" + subtitleStyle.Render("art linked")
+	albumLine := truncate(empty(m.status.Album, "Sonos"), max(8, innerWidth))
+	coverArt := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render(initials)
+	centerArt := true
+	if strings.TrimSpace(m.artView) != "" && m.artURL == strings.TrimSpace(m.status.AlbumArt) {
+		coverArt = renderCoverArt(innerWidth, m.artView)
+		centerArt = false
+	}
+	if centerArt {
+		coverArt = centerLine(innerWidth, coverArt)
 	}
 
 	coverText := strings.Join([]string{
-		labelStyle.Render("Now Playing"),
-		lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render(initials),
-		subtitleStyle.Render(albumLine),
-	}, "\n") + artHint
+		centerLine(innerWidth, labelStyle.Render("Now Playing")),
+		coverArt,
+		centerLine(innerWidth, subtitleStyle.Render(albumLine)),
+	}, "\n")
 
-	return coverStyle.Width(contentWidth).Height(10).Render(coverText)
+	return coverStyle.Width(contentWidth).Height(12).Render(coverText)
+}
+
+func renderCoverArt(width int, art string) string {
+	artWidth := albumArtColumns
+	if width > 0 && width < artWidth {
+		artWidth = max(1, width)
+	}
+	leftPad := max(0, (width-artWidth)/2)
+	prefix := strings.Repeat(" ", leftPad)
+	blank := prefix + strings.Repeat(" ", artWidth)
+
+	lines := []string{""}
+	if strings.Contains(art, "\x1b_G") {
+		lines = append(lines, prefix+art+strings.Repeat(" ", artWidth))
+		for i := 1; i < albumArtRows; i++ {
+			lines = append(lines, blank)
+		}
+		return strings.Join(lines, "\n")
+	}
+
+	artLines := strings.Split(art, "\n")
+	for i := 0; i < albumArtRows; i++ {
+		if i < len(artLines) {
+			lines = append(lines, prefix+artLines[i])
+		} else {
+			lines = append(lines, blank)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func centerLine(width int, value string) string {
+	if width <= 0 {
+		return value
+	}
+	lineWidth := lipgloss.Width(value)
+	if lineWidth >= width {
+		return value
+	}
+	return strings.Repeat(" ", (width-lineWidth)/2) + value
 }
 
 func (m Model) renderTrackDetails(width int) string {

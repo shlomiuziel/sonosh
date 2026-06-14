@@ -33,6 +33,9 @@ type Model struct {
 	rooms     []Room
 	roomIndex int
 	status    Status
+	artURL    string
+	artView   string
+	artViews  map[string]string
 
 	mode               mode
 	loading            bool
@@ -65,6 +68,12 @@ type roomsMsg struct {
 type statusMsg struct {
 	status Status
 	err    error
+}
+
+type albumArtMsg struct {
+	url  string
+	view string
+	err  error
 }
 
 type actionMsg struct {
@@ -152,8 +161,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		if msg.err == nil {
 			m.status = msg.status
+			if url := strings.TrimSpace(msg.status.AlbumArt); url != "" {
+				if url != m.artURL {
+					m.artURL = url
+					m.artView = ""
+					if view, ok := m.artViews[url]; ok {
+						m.artView = view
+					} else {
+						return m, fetchAlbumArtCmd(url, supportsKittyGraphics())
+					}
+				}
+			} else {
+				m.artURL = ""
+				m.artView = ""
+			}
 			m.publishNowPlaying()
 		}
+		return m, nil
+	case albumArtMsg:
+		if msg.err != nil {
+			return m, nil
+		}
+		if msg.url != m.artURL {
+			return m, nil
+		}
+		m.artView = msg.view
+		if m.artViews == nil {
+			m.artViews = make(map[string]string)
+		}
+		m.artViews[msg.url] = msg.view
 		return m, nil
 	case actionMsg:
 		m.loading = false

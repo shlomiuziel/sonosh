@@ -405,6 +405,8 @@ func TestViewRendersPlayerSurface(t *testing.T) {
 		Duration: "00:03:20",
 		Volume:   42,
 	}
+	model.artURL = model.status.AlbumArt
+	model.artView = "▀▀▀▀\n▀▀▀▀"
 
 	view := model.View()
 	for _, want := range []string{
@@ -415,7 +417,7 @@ func TestViewRendersPlayerSurface(t *testing.T) {
 		"Whenever Wherever",
 		"Shakira",
 		"Laundry Service",
-		"art linked",
+		"▀▀▀▀",
 		"42%",
 	} {
 		if !strings.Contains(view, want) {
