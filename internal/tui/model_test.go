@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/shlomiuziel/sonosh/internal/macoshelper"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
@@ -467,6 +468,17 @@ func TestViewRendersSearchSurface(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("search view missing %q:\n%s", want, view)
 		}
+	}
+}
+
+func TestFooterFitsNarrowWidth(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	footer := model.renderFooter(32)
+	if strings.Contains(footer, "\n") {
+		t.Fatalf("footer wrapped unexpectedly:\n%s", footer)
+	}
+	if got := lipgloss.Width(footer); got > 32 {
+		t.Fatalf("footer width = %d, want <= 32:\n%s", got, footer)
 	}
 }
 

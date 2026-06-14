@@ -119,17 +119,17 @@ func (m Model) renderBody(width int) string {
 	}
 
 	left := m.renderRooms(sidebarWidth)
-	rightWidth := width - sidebarWidth - 2
-	right := lipgloss.JoinVertical(
-		lipgloss.Left,
-		m.renderHeader(rightWidth),
-		m.renderNowPlaying(rightWidth),
-		m.renderSearchIfActive(rightWidth),
-	)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right)
+	rightWidth := width - sidebarWidth - 1
+	right := m.renderRightPane(rightWidth)
+	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(right))
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneSeparator(separatorHeight), right)
 }
 
 func (m Model) renderHeader(width int) string {
+	return m.renderHeaderContent(width)
+}
+
+func (m Model) renderHeaderContent(width int) string {
 	state := normalizeState(m.status.State)
 	room := "No room"
 	if len(m.rooms) > 0 {
@@ -185,6 +185,11 @@ func (m Model) renderRooms(width int) string {
 }
 
 func (m Model) renderNowPlaying(width int) string {
+	content := m.renderNowPlayingContent(width)
+	return panelStyle.Width(max(1, width-borderChrome)).Render(content)
+}
+
+func (m Model) renderNowPlayingContent(width int) string {
 	innerWidth := max(24, width-6)
 	coverWidth := 22
 	detailsWidth := innerWidth - coverWidth - 3
@@ -202,7 +207,18 @@ func (m Model) renderNowPlaying(width int) string {
 	} else {
 		content = lipgloss.JoinHorizontal(lipgloss.Top, cover, "   ", details)
 	}
-	return panelStyle.Width(max(1, width-borderChrome)).Render(content)
+	return content
+}
+
+func (m Model) renderRightPane(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	var parts []string
+	parts = append(parts, m.renderHeaderContent(contentWidth))
+	parts = append(parts, m.renderNowPlayingContent(contentWidth))
+	if search := m.renderSearchContent(contentWidth); search != "" {
+		parts = append(parts, search)
+	}
+	return panelStyle.Width(contentWidth).Render(strings.Join(parts, "\n"))
 }
 
 func (m Model) renderCover(width int) string {
@@ -278,6 +294,11 @@ func (m Model) renderSearchIfActive(width int) string {
 }
 
 func (m Model) renderSearchPanel(width int) string {
+	content := m.renderSearchContent(width)
+	return panelStyle.BorderForeground(colorSelected).Width(max(1, width-borderChrome)).Render(content)
+}
+
+func (m Model) renderSearchContent(width int) string {
 	contentWidth := max(1, width-borderChrome)
 	var lines []string
 	query := m.searchQuery
@@ -317,7 +338,7 @@ func (m Model) renderSearchPanel(width int) string {
 		}
 	}
 
-	return panelStyle.BorderForeground(colorSelected).Width(contentWidth).Render(strings.Join(lines, "\n"))
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) renderFooter(width int) string {
@@ -336,8 +357,47 @@ func (m Model) renderFooter(width int) string {
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
 	}
-	line := lipgloss.JoinHorizontal(lipgloss.Top, status, lipgloss.NewStyle().Width(max(1, width-lipgloss.Width(status)-lipgloss.Width(keys))).Render(""), hintStyle.Render(keys))
+	available := max(0, width-lipgloss.Width(status)-2)
+	keys = footerKeys(keys, available)
+	line := status
+	if keys != "" {
+		line = lipgloss.JoinHorizontal(lipgloss.Top, status, "  ", hintStyle.Render(keys))
+	}
 	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
+}
+
+func footerKeys(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	choices := []string{value}
+	switch value {
+	case "enter play  ctrl+t tracks  ctrl+p playlists  esc close":
+		choices = append(choices,
+			"enter play  ctrl+t  ctrl+p  esc",
+			"enter  esc",
+		)
+	default:
+		choices = append(choices,
+			"move  enter  /",
+			"/",
+		)
+	}
+	for _, choice := range choices {
+		if lipgloss.Width(choice) <= width {
+			return choice
+		}
+	}
+	return ""
+}
+
+func paneSeparator(height int) string {
+	return lipgloss.NewStyle().
+		Foreground(colorSubtle).
+		Background(colorPanel).
+		Width(1).
+		Height(max(1, height)).
+		Render("│")
 }
 
 func statusPill(state string) string {
