@@ -16,20 +16,20 @@ const (
 )
 
 var (
-	colorInk      = lipgloss.Color("#EAF0F6")
-	colorMuted    = lipgloss.Color("#77818F")
-	colorSubtle   = lipgloss.Color("#3C4654")
-	colorPanel    = lipgloss.Color("#1E2633")
-	colorPanelHi  = lipgloss.Color("#2A3445")
-	colorAccent   = lipgloss.Color("#68D391")
-	colorAccent2  = lipgloss.Color("#7DD3FC")
-	colorWarn     = lipgloss.Color("#F6AD55")
-	colorError    = lipgloss.Color("#FC8181")
-	colorSelected = lipgloss.Color("#D6BCFA")
+	colorInk      = lipgloss.Color("#F5F7FB")
+	colorMuted    = lipgloss.Color("#91A0B6")
+	colorSubtle   = lipgloss.Color("#56657A")
+	colorPanel    = lipgloss.Color("#222B3D")
+	colorPanelHi  = lipgloss.Color("#35435C")
+	colorAccent   = lipgloss.Color("#78E08F")
+	colorAccent2  = lipgloss.Color("#5ED6FF")
+	colorWarn     = lipgloss.Color("#FFB15C")
+	colorError    = lipgloss.Color("#FF758F")
+	colorSelected = lipgloss.Color("#FFD166")
 
 	baseStyle = lipgloss.NewStyle().
 			Foreground(colorInk).
-			Background(lipgloss.Color("#111722"))
+			Background(lipgloss.Color("#141C29"))
 
 	panelStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -66,7 +66,7 @@ var (
 			Border(lipgloss.ThickBorder()).
 			BorderForeground(colorAccent2).
 			Foreground(colorInk).
-			Background(lipgloss.Color("#17202E")).
+			Background(lipgloss.Color("#1A2433")).
 			Padding(0, 2)
 
 	hintStyle = lipgloss.NewStyle().
