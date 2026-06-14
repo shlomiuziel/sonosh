@@ -55,6 +55,10 @@ func renderAlbumArtView(data []byte, kitty bool) (string, error) {
 	return renderAlbumArtBlocks(data, albumArtColumns, albumArtRows)
 }
 
+func clearKittyGraphics() string {
+	return "\x1b_Ga=d,q=1\x1b\\"
+}
+
 func imageDataFromReader(r io.Reader) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if _, err := buf.ReadFrom(r); err != nil {

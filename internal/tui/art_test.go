@@ -97,6 +97,16 @@ func TestRenderAlbumArtKitty(t *testing.T) {
 	}
 }
 
+func TestClearKittyGraphicsSequence(t *testing.T) {
+	seq := clearKittyGraphics()
+	if !strings.Contains(seq, "\x1b_Ga=d") {
+		t.Fatalf("clear sequence missing delete action: %q", seq)
+	}
+	if !strings.Contains(seq, "q=1") {
+		t.Fatalf("clear sequence should suppress OK responses: %q", seq)
+	}
+}
+
 func TestRenderCoverArtUsesProvidedInnerWidth(t *testing.T) {
 	art := strings.Repeat("x", albumArtColumns)
 	got := renderCoverArt(albumArtColumns, art)

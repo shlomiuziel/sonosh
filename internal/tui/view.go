@@ -23,13 +23,21 @@ func (m Model) renderApp() string {
 	if width < minWidth {
 		width = minWidth
 	}
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
 
 	contentWidth := width - 2
 	body := m.renderBody(contentWidth)
-	footer := m.renderFooter(contentWidth)
+	footer := m.renderFooterRow(contentWidth)
 
 	view := lipgloss.JoinVertical(lipgloss.Left, body, footer)
-	return baseStyle.Width(width).Render(view)
+	rendered := baseStyle.Width(width).Height(height).Render(view)
+	if m.mode == modeSearch && supportsKittyGraphics() {
+		return clearKittyGraphics() + rendered
+	}
+	return rendered
 }
 
 func (m Model) renderBody(width int) string {
@@ -37,10 +45,11 @@ func (m Model) renderBody(width int) string {
 		sections := []string{
 			m.renderHeader(width),
 			m.renderNowPlaying(width),
-			m.renderRooms(width),
 		}
-		if search := m.renderSearchIfActive(width); search != "" {
-			sections = append(sections, search)
+		if m.mode == modeSearch {
+			sections = append(sections, m.renderSearchPanel(width))
+		} else {
+			sections = append(sections, m.renderRooms(width))
 		}
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
@@ -123,18 +132,21 @@ func (m Model) renderNowPlayingContent(width int) string {
 	innerWidth := max(24, width-6)
 	coverWidth := 22
 	detailsWidth := innerWidth - coverWidth - 3
-	if width < compactAtWidth {
+	if width < compactAtWidth || m.mode == modeSearch {
 		coverWidth = min(28, innerWidth)
 		detailsWidth = innerWidth
 	}
 
-	cover := m.renderCover(coverWidth)
 	details := m.renderTrackDetails(detailsWidth)
 
 	var content string
-	if width < compactAtWidth {
+	if m.mode == modeSearch {
+		content = lipgloss.JoinVertical(lipgloss.Center, details)
+	} else if width < compactAtWidth {
+		cover := m.renderCover(coverWidth)
 		content = lipgloss.JoinVertical(lipgloss.Center, cover, details)
 	} else {
+		cover := m.renderCover(coverWidth)
 		content = lipgloss.JoinHorizontal(lipgloss.Top, cover, "   ", details)
 	}
 	return content
@@ -142,12 +154,16 @@ func (m Model) renderNowPlayingContent(width int) string {
 
 func (m Model) renderRightPane(width int) string {
 	contentWidth := max(1, width-borderChrome)
+	if m.mode == modeSearch {
+		return panelStyle.
+			BorderForeground(colorSelected).
+			Width(contentWidth).
+			Render(m.renderSearchSpotlight(contentWidth))
+	}
+
 	var parts []string
 	parts = append(parts, m.renderHeaderContent(contentWidth))
 	parts = append(parts, m.renderNowPlayingContent(contentWidth))
-	if search := m.renderSearchContent(contentWidth); search != "" {
-		parts = append(parts, search)
-	}
 	return panelStyle.Width(contentWidth).Render(strings.Join(parts, "\n"))
 }
 
@@ -262,16 +278,31 @@ func (m Model) renderTransport(width int) string {
 	return truncate(line, width)
 }
 
-func (m Model) renderSearchIfActive(width int) string {
-	if m.mode != modeSearch {
-		return ""
-	}
-	return m.renderSearchPanel(width)
-}
-
 func (m Model) renderSearchPanel(width int) string {
 	content := m.renderSearchContent(width)
 	return panelStyle.BorderForeground(colorSelected).Width(max(1, width-borderChrome)).Render(content)
+}
+
+func (m Model) renderSearchSpotlight(width int) string {
+	modalWidth := min(width-6, 78)
+	if modalWidth < 44 {
+		modalWidth = max(1, width-2)
+	}
+	content := m.renderSearchContent(modalWidth)
+	modal := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSelected).
+		Background(colorPanelHi).
+		Padding(1, 2).
+		Width(modalWidth).
+		Render(content)
+	modalHeight := lipgloss.Height(modal)
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
+	targetHeight := max(modalHeight, height-6)
+	return lipgloss.Place(width, targetHeight, lipgloss.Center, lipgloss.Center, modal)
 }
 
 func (m Model) renderSearchContent(width int) string {
@@ -281,12 +312,8 @@ func (m Model) renderSearchContent(width int) string {
 	if query == "" {
 		query = "type to search..."
 	}
-	lines = append(lines, lipgloss.JoinHorizontal(
-		lipgloss.Center,
-		labelStyle.Render(m.config.SearchService+" / "+m.searchCategory),
-		"  ",
-		accentStyle.Render("> "+displayText(query, max(10, width-24))),
-	))
+	lines = append(lines, labelStyle.Render(m.config.SearchService+" / "+m.searchCategory))
+	lines = append(lines, renderSearchField(query, contentWidth))
 
 	if m.searchPreviewQuery != "" && m.searchPreviewQuery != m.searchQuery {
 		lines = append(lines, subtitleStyle.Render("updating results for "+displayText(m.searchQuery, max(10, contentWidth-22))))
@@ -319,7 +346,29 @@ func (m Model) renderSearchContent(width int) string {
 		lines = append(lines, preview)
 	}
 
+	lines = append(lines, "")
+	lines = append(lines, hintStyle.Render("enter play  ctrl+t tracks  ctrl+p playlists  esc close"))
+
 	return strings.Join(lines, "\n")
+}
+
+func renderSearchField(query string, width int) string {
+	innerWidth := max(8, width-8)
+	display := displayText(query, innerWidth)
+	if strings.TrimSpace(query) == "" {
+		display = hintStyle.Render(display)
+	} else {
+		display = titleStyle.Foreground(colorInk).Render(display)
+	}
+	field := lipgloss.NewStyle().
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSelected).
+		Background(colorPanelHi).
+		Foreground(colorInk).
+		Width(max(16, width-4)).
+		Render("> " + display)
+	return field
 }
 
 func (m Model) renderPlaylistPreview(width int) string {
@@ -383,6 +432,17 @@ func (m Model) renderFooter(width int) string {
 		segments = append(segments, "  ", theme, " ", themeHint)
 	}
 	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(lipgloss.JoinHorizontal(lipgloss.Top, segments...))
+}
+
+func (m Model) renderFooterRow(width int) string {
+	if width < compactAtWidth {
+		return m.renderFooter(width)
+	}
+	rightWidth := max(1, width-sidebarWidth-1)
+	gutter := lipgloss.NewStyle().
+		Width(sidebarWidth + 1).
+		Render("")
+	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, m.renderFooter(rightWidth))
 }
 
 func footerKeys(value string, width int) string {

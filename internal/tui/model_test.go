@@ -518,6 +518,9 @@ func TestViewRendersPlayerSurface(t *testing.T) {
 	if !strings.Contains(view, "╭") || !strings.Contains(view, "━") {
 		t.Fatalf("view missing styled panel/progress glyphs:\n%s", view)
 	}
+	if strings.Contains(strings.ToUpper(view), "SPOTIFY / TRACKS") {
+		t.Fatalf("dashboard unexpectedly rendered search UI:\n%s", view)
+	}
 }
 
 func TestViewRendersLoadingSpinner(t *testing.T) {
@@ -536,6 +539,8 @@ func TestViewRendersLoadingSpinner(t *testing.T) {
 }
 
 func TestViewRendersSearchSurface(t *testing.T) {
+	t.Setenv("TERM_PROGRAM", "Ghostty")
+
 	backend := &fakeBackend{}
 	model := NewModel(backend, testConfig())
 	model.width = 110
@@ -543,6 +548,8 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	model.mode = modeSearch
 	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
 	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist"}
+	model.artURL = "http://example.test/art.jpg"
+	model.artView = "▀▀▀▀\n▀▀▀▀"
 	model.searchQuery = "mas que nada"
 	model.searchPreviewQuery = "mas que nada"
 	model.searchItems = []SearchResult{
@@ -556,12 +563,20 @@ func TestViewRendersSearchSurface(t *testing.T) {
 		"> mas que nada",
 		"results for mas que nada",
 		"Mas Que Nada",
-		"theme aurora",
-		"ctrl+v",
+		"ENTER PLAY  CTRL+T TRACKS  CTRL+P PLAYLISTS  ESC CLOSE",
 	} {
-		if !strings.Contains(view, want) {
+		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("search view missing %q:\n%s", want, view)
 		}
+	}
+	if !strings.Contains(view, "╭") || !strings.Contains(strings.ToUpper(view), "SPOTIFY / TRACKS") {
+		t.Fatalf("search modal missing expected framing or label:\n%s", view)
+	}
+	if strings.Contains(view, "▀▀▀▀") {
+		t.Fatalf("search surface unexpectedly rendered album art:\n%s", view)
+	}
+	if !strings.Contains(view, clearKittyGraphics()) {
+		t.Fatalf("search surface should clear terminal graphics:\n%s", view)
 	}
 }
 
@@ -573,6 +588,18 @@ func TestFooterFitsNarrowWidth(t *testing.T) {
 	}
 	if got := lipgloss.Width(footer); got > 32 {
 		t.Fatalf("footer width = %d, want <= 32:\n%s", got, footer)
+	}
+}
+
+func TestWideFooterStartsUnderRightPane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	footer := model.renderFooterRow(108)
+	gutter := strings.Repeat(" ", sidebarWidth+1)
+	if !strings.HasPrefix(footer, gutter) {
+		t.Fatalf("footer did not start after sidebar gutter:\n%q", footer)
+	}
+	if got := lipgloss.Width(footer); got > 108 {
+		t.Fatalf("footer width = %d, want <= 108:\n%s", got, footer)
 	}
 }
 
