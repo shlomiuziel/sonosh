@@ -147,7 +147,7 @@ func (m Model) renderHeaderContent(width int) string {
 		lipgloss.Center,
 		accentStyle.Render("sonosh"),
 		"  ",
-		subtitleStyle.Render(truncate(room, max(12, width/3))),
+		subtitleStyle.Render(displayText(room, max(12, width/3))),
 		"  ",
 		statusView,
 	)
@@ -166,8 +166,8 @@ func (m Model) renderRooms(width int) string {
 
 	for i, room := range m.rooms {
 		nameWidth := max(8, contentWidth-4)
-		name := truncate(room.Name, nameWidth)
-		members := truncate(strings.Join(room.GroupMembers, ", "), nameWidth)
+		name := displayText(room.Name, nameWidth)
+		members := displayText(strings.Join(room.GroupMembers, ", "), nameWidth)
 		if members == "" {
 			members = room.IP
 		}
@@ -226,7 +226,7 @@ func (m Model) renderCover(width int) string {
 	title := empty(m.status.Title, "No Track")
 	artist := empty(m.status.Artist, "sonosh")
 	initials := coverInitials(title, artist)
-	albumLine := truncate(empty(m.status.Album, "Sonos"), max(8, innerWidth))
+	albumLine := displayText(empty(m.status.Album, "Sonos"), max(8, innerWidth))
 	coverArt := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render(initials)
 	centerArt := true
 	if strings.TrimSpace(m.artView) != "" && m.artURL == strings.TrimSpace(m.status.AlbumArt) {
@@ -295,9 +295,9 @@ func (m Model) renderTrackDetails(width int) string {
 	title := titleStyle.
 		Foreground(colorInk).
 		Bold(true).
-		Render(truncate(empty(m.status.Title, "Nothing playing"), width))
-	artist := subtitleStyle.Render(truncate(empty(m.status.Artist, "Unknown artist"), width))
-	album := subtitleStyle.Render(truncate(empty(m.status.Album, "Unknown album"), width))
+		Render(displayText(empty(m.status.Title, "Nothing playing"), width))
+	artist := subtitleStyle.Render(displayText(empty(m.status.Artist, "Unknown artist"), width))
+	album := subtitleStyle.Render(displayText(empty(m.status.Album, "Unknown album"), width))
 
 	rows := []string{
 		labelStyle.Render("Track"),
@@ -354,13 +354,13 @@ func (m Model) renderSearchContent(width int) string {
 		lipgloss.Center,
 		labelStyle.Render(m.config.SearchService+" / "+m.searchCategory),
 		"  ",
-		accentStyle.Render("> "+truncate(query, max(10, width-24))),
+		accentStyle.Render("> "+displayText(query, max(10, width-24))),
 	))
 
 	if m.searchPreviewQuery != "" && m.searchPreviewQuery != m.searchQuery {
-		lines = append(lines, subtitleStyle.Render("updating results for "+m.searchQuery))
+		lines = append(lines, subtitleStyle.Render("updating results for "+displayText(m.searchQuery, max(10, contentWidth-22))))
 	} else if m.searchPreviewQuery != "" {
-		lines = append(lines, subtitleStyle.Render("results for "+m.searchPreviewQuery))
+		lines = append(lines, subtitleStyle.Render("results for "+displayText(m.searchPreviewQuery, max(10, contentWidth-12))))
 	}
 
 	if len(m.searchItems) == 0 {
@@ -370,7 +370,7 @@ func (m Model) renderSearchContent(width int) string {
 		limit := min(len(m.searchItems), 8)
 		for i := 0; i < limit; i++ {
 			item := m.searchItems[i]
-			row := fmt.Sprintf("%2d  %-9s  %s", i+1, truncate(item.Item.ItemType, 9), truncate(item.Title(), max(8, contentWidth-18)))
+			row := fmt.Sprintf("%2d  %-9s  %s", i+1, truncate(item.Item.ItemType, 9), displayText(item.Title(), max(8, contentWidth-18)))
 			if i == m.searchIndex {
 				row = selectedStyle.Width(max(1, contentWidth-4)).Render(row)
 			} else {
@@ -389,11 +389,11 @@ func (m Model) renderSearchContent(width int) string {
 func (m Model) renderFooter(width int) string {
 	var status string
 	if m.err != nil {
-		status = errorStyle.Render("Error: " + truncate(m.err.Error(), max(10, width-8)))
+		status = errorStyle.Render("Error: " + displayText(m.err.Error(), max(10, width-8)))
 	} else if m.loading {
 		status = accentStyle.Render(m.spinner() + " loading")
 	} else if m.message != "" {
-		status = messageStyle.Render(truncate(m.message, max(10, width-8)))
+		status = messageStyle.Render(displayText(m.message, max(10, width-8)))
 	} else {
 		status = hintStyle.Render("q quit  tab switch  r refresh")
 	}
