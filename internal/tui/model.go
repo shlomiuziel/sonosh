@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	refreshEvery = 5 * time.Second
-	spinnerEvery = 120 * time.Millisecond
+	refreshEvery         = 5 * time.Second
+	spinnerEvery         = 120 * time.Millisecond
+	playlistPreviewLimit = 6
 )
 
 type Config struct {
@@ -39,18 +40,22 @@ type Model struct {
 	artView   string
 	artViews  map[string]string
 
-	mode               mode
-	loading            bool
-	spinnerFrame       int
-	err                error
-	message            string
-	searchQuery        string
-	searchPreviewQuery string
-	searchCategory     string
-	searchGeneration   int
-	searchItems        []SearchResult
-	searchIndex        int
-	themeName          string
+	mode                    mode
+	loading                 bool
+	spinnerFrame            int
+	err                     error
+	message                 string
+	searchQuery             string
+	searchPreviewQuery      string
+	searchCategory          string
+	searchGeneration        int
+	searchItems             []SearchResult
+	searchIndex             int
+	themeName               string
+	searchPreviewItemID     string
+	searchPreviewLoading    bool
+	searchPreviewGeneration int
+	searchPreviewItems      []SearchResult
 
 	width  int
 	height int
@@ -87,6 +92,13 @@ type actionMsg struct {
 type searchMsg struct {
 	query      string
 	category   string
+	generation int
+	items      []SearchResult
+	err        error
+}
+
+type playlistPreviewMsg struct {
+	itemID     string
 	generation int
 	items      []SearchResult
 	err        error
@@ -215,7 +227,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchItems = msg.items
 			m.searchIndex = 0
 			m.message = fmt.Sprintf("%d search results", len(msg.items))
+			m.resetPlaylistPreview()
+			updated, cmd := m.previewSelectedSearchResult()
+			return updated, cmd
 		}
+		return m, nil
+	case playlistPreviewMsg:
+		if msg.generation != m.searchPreviewGeneration || msg.itemID != m.searchPreviewItemID {
+			return m, nil
+		}
+		m.searchPreviewLoading = false
+		if msg.err != nil {
+			m.searchPreviewItems = nil
+			return m, nil
+		}
+		m.searchPreviewItems = msg.items
 		return m, nil
 	case tickMsg:
 		if len(m.rooms) > 0 && !m.loading {
@@ -348,17 +374,20 @@ func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.searchIndex > 0 {
 			m.searchIndex--
 		}
-		return m, nil
+		updated, cmd := m.previewSelectedSearchResult()
+		return updated, cmd
 	case "down", "j":
 		if m.searchIndex < len(m.searchItems)-1 {
 			m.searchIndex++
 		}
-		return m, nil
+		updated, cmd := m.previewSelectedSearchResult()
+		return updated, cmd
 	case "backspace", "ctrl+h":
 		m.searchQuery = trimLastRune(m.searchQuery)
 		m.searchIndex = 0
 		m.searchGeneration++
 		m.loading = true
+		m.resetPlaylistPreview()
 		return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
 	case "ctrl+u":
 		m.searchQuery = ""
@@ -367,6 +396,7 @@ func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.searchPreviewQuery = ""
 		m.searchItems = nil
+		m.resetPlaylistPreview()
 		return m, nil
 	case "tab", "esc":
 		m.mode = modeDashboard
@@ -396,6 +426,7 @@ func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.searchIndex = 0
 			m.searchGeneration++
 			m.loading = true
+			m.resetPlaylistPreview()
 			return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
 		}
 		return m, nil
@@ -410,6 +441,7 @@ func (m Model) setSearchCategory(category string) (tea.Model, tea.Cmd) {
 	m.searchIndex = 0
 	m.searchPreviewQuery = ""
 	m.searchItems = nil
+	m.resetPlaylistPreview()
 	m.message = "searching " + category
 	m.err = nil
 	m.searchGeneration++
@@ -418,6 +450,35 @@ func (m Model) setSearchCategory(category string) (tea.Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
+}
+
+func (m Model) previewSelectedSearchResult() (tea.Model, tea.Cmd) {
+	m.searchPreviewGeneration++
+	m.searchPreviewItemID = ""
+	m.searchPreviewLoading = false
+	m.searchPreviewItems = nil
+	if len(m.rooms) == 0 || len(m.searchItems) == 0 || m.searchIndex < 0 || m.searchIndex >= len(m.searchItems) {
+		return m, nil
+	}
+	selected := m.searchItems[m.searchIndex]
+	if !strings.EqualFold(strings.TrimSpace(selected.Item.ItemType), "playlist") {
+		return m, nil
+	}
+	id := strings.TrimSpace(selected.Item.ID)
+	if id == "" {
+		return m, nil
+	}
+	m.searchPreviewItemID = id
+	m.searchPreviewLoading = true
+	gen := m.searchPreviewGeneration
+	return m, browsePlaylistCmd(m.backend, m.config, m.selectedRoom(), selected, gen)
+}
+
+func (m *Model) resetPlaylistPreview() {
+	m.searchPreviewGeneration++
+	m.searchPreviewItemID = ""
+	m.searchPreviewLoading = false
+	m.searchPreviewItems = nil
 }
 
 func (m Model) View() string {
@@ -536,6 +597,15 @@ func playSearchCmd(backend Backend, cfg Config, room Room, result SearchResult) 
 		defer cancel()
 		err := backend.PlaySearchResult(ctx, room, cfg.SearchService, result)
 		return actionMsg{message: "playing " + result.Title(), err: err}
+	}
+}
+
+func browsePlaylistCmd(backend Backend, cfg Config, room Room, result SearchResult, generation int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
+		defer cancel()
+		items, err := backend.BrowsePlaylist(ctx, room, cfg.SearchService, result, playlistPreviewLimit)
+		return playlistPreviewMsg{itemID: strings.TrimSpace(result.Item.ID), generation: generation, items: items, err: err}
 	}
 }
 

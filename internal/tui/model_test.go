@@ -356,6 +356,54 @@ func TestSearchModeSwitchesToPlaylists(t *testing.T) {
 	}
 }
 
+func TestPlaylistSearchShowsPreviewTracks(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+		searchFn: func(query string) []SearchResult {
+			return []SearchResult{{
+				Item: sonos.SMAPIItem{ID: "spotify:playlist:" + query, ItemType: "playlist", Title: "Playlist " + query},
+			}}
+		},
+		browseFn: func(id string) []SearchResult {
+			return []SearchResult{
+				{Item: sonos.SMAPIItem{ID: id + ":1", ItemType: "track", Title: "Track One"}},
+				{Item: sonos.SMAPIItem{ID: id + ":2", ItemType: "track", Title: "Track Two"}},
+			}
+		},
+	}
+	model := NewModel(backend, testConfig())
+	model.rooms = backend.rooms
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected search command")
+	}
+	updated, previewCmd := model.Update(runCmd(cmd))
+	model = updated.(Model)
+	if previewCmd == nil {
+		t.Fatal("expected playlist preview command")
+	}
+	updated, _ = model.Update(runCmd(previewCmd))
+	model = updated.(Model)
+	if len(model.searchPreviewItems) != 2 {
+		t.Fatalf("preview items = %d, want 2", len(model.searchPreviewItems))
+	}
+
+	view := model.View()
+	for _, want := range []string{
+		"PLAYLIST PREVIEW",
+		"Track One",
+		"Track Two",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("playlist preview missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestMacHelperCommandDispatchesTransport(t *testing.T) {
 	backend := &fakeBackend{
 		rooms:  []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
@@ -566,6 +614,7 @@ type fakeBackend struct {
 	status           Status
 	results          []SearchResult
 	searchFn         func(query string) []SearchResult
+	browseFn         func(id string) []SearchResult
 	transportAction  string
 	volume           int
 	muted            bool
@@ -604,6 +653,13 @@ func (f *fakeBackend) Search(_ context.Context, _ Room, _, category, query strin
 		return f.searchFn(query), nil
 	}
 	return f.results, nil
+}
+
+func (f *fakeBackend) BrowsePlaylist(_ context.Context, _ Room, _ string, result SearchResult, _ int) ([]SearchResult, error) {
+	if f.browseFn != nil {
+		return f.browseFn(result.Item.ID), nil
+	}
+	return nil, nil
 }
 
 func (f *fakeBackend) PlaySearchResult(_ context.Context, _ Room, _ string, result SearchResult) error {

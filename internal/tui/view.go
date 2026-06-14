@@ -314,6 +314,37 @@ func (m Model) renderSearchContent(width int) string {
 		}
 	}
 
+	if preview := m.renderPlaylistPreview(contentWidth); preview != "" {
+		lines = append(lines, "")
+		lines = append(lines, preview)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderPlaylistPreview(width int) string {
+	if m.searchPreviewItemID == "" && !m.searchPreviewLoading && len(m.searchPreviewItems) == 0 {
+		return ""
+	}
+	var lines []string
+	lines = append(lines, labelStyle.Render("Playlist preview"))
+	if m.searchPreviewLoading && len(m.searchPreviewItems) == 0 {
+		lines = append(lines, subtitleStyle.Render("Loading tracks..."))
+		return strings.Join(lines, "\n")
+	}
+	if len(m.searchPreviewItems) == 0 {
+		lines = append(lines, subtitleStyle.Render("No tracks found"))
+		return strings.Join(lines, "\n")
+	}
+	limit := min(len(m.searchPreviewItems), 6)
+	for i := 0; i < limit; i++ {
+		item := m.searchPreviewItems[i]
+		row := fmt.Sprintf("%2d  %s", i+1, displayText(item.Title(), max(8, width-6)))
+		lines = append(lines, row)
+	}
+	if len(m.searchPreviewItems) > limit {
+		lines = append(lines, subtitleStyle.Render(fmt.Sprintf("+%d more", len(m.searchPreviewItems)-limit)))
+	}
 	return strings.Join(lines, "\n")
 }
 
