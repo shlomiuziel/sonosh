@@ -18,11 +18,13 @@ const (
 )
 
 type Config struct {
-	Timeout        time.Duration
-	SearchService  string
-	SearchCategory string
-	SearchLimit    int
-	MacHelperPath  string
+	Timeout         time.Duration
+	SearchService   string
+	SearchCategory  string
+	SearchLimit     int
+	MacHelperPath   string
+	Theme           string
+	ThemeConfigPath string
 }
 
 type Model struct {
@@ -48,6 +50,7 @@ type Model struct {
 	searchGeneration   int
 	searchItems        []SearchResult
 	searchIndex        int
+	themeName          string
 
 	width  int
 	height int
@@ -118,6 +121,7 @@ func NewModel(backend Backend, cfg Config) Model {
 	if cfg.SearchLimit <= 0 {
 		cfg.SearchLimit = 10
 	}
+	themeName := applyTheme(cfg.Theme)
 	return Model{
 		backend:        backend,
 		config:         cfg,
@@ -125,6 +129,7 @@ func NewModel(backend Backend, cfg Config) Model {
 		mode:           modeDashboard,
 		loading:        true,
 		searchCategory: cfg.SearchCategory,
+		themeName:      themeName,
 	}
 }
 
@@ -252,6 +257,15 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "ctrl+v":
+		m.themeName = cycleTheme()
+		if err := SaveThemeName(m.config.ThemeConfigPath, m.themeName); err != nil {
+			m.message = "theme save failed: " + err.Error()
+		} else {
+			m.message = "theme: " + m.themeName
+		}
+		m.err = nil
+		return m, nil
 	}
 
 	if m.mode == modeSearch {

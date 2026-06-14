@@ -12,19 +12,34 @@ import (
 )
 
 func main() {
+	themeConfigPath, err := tui.DefaultThemeConfigPath()
+	if err != nil {
+		themeConfigPath = ""
+	}
+	storedTheme, err := tui.LoadThemeName(themeConfigPath)
+	if err != nil {
+		storedTheme = ""
+	}
+	defaultTheme := "aurora"
+	if storedTheme != "" {
+		defaultTheme = storedTheme
+	}
 	timeout := flag.Duration("timeout", sonos.DefaultTimeout, "network timeout")
 	service := flag.String("service", "Spotify", "SMAPI music service for search")
 	category := flag.String("category", "tracks", "SMAPI search category (tracks or playlists; switch in the TUI with ctrl+t/ctrl+p)")
 	limit := flag.Int("limit", 10, "SMAPI search result limit")
+	theme := flag.String("theme", defaultTheme, "visual theme (aurora, sunset, electric, midnight; cycle in the TUI with ctrl+v)")
 	macHelperPath := flag.String("mac-helper-path", "", "path to sonosh-macos-helper (macOS only; defaults to SONOSH_MAC_HELPER or executable sibling)")
 	flag.Parse()
 
 	cfg := tui.Config{
-		Timeout:        normalizeTimeout(*timeout),
-		SearchService:  *service,
-		SearchCategory: *category,
-		SearchLimit:    *limit,
-		MacHelperPath:  *macHelperPath,
+		Timeout:         normalizeTimeout(*timeout),
+		SearchService:   *service,
+		SearchCategory:  *category,
+		SearchLimit:     *limit,
+		Theme:           *theme,
+		ThemeConfigPath: themeConfigPath,
+		MacHelperPath:   *macHelperPath,
 	}
 	model := tui.NewModel(tui.NewSonosBackend(cfg.Timeout), cfg)
 	program := tea.NewProgram(model, tea.WithAltScreen())

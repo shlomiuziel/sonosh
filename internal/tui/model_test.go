@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +114,47 @@ func TestDashboardKeysDispatchActions(t *testing.T) {
 	_ = runCmd(cmd)
 	if backend.volume != 30 {
 		t.Fatalf("volume = %d, want 30", backend.volume)
+	}
+}
+
+func TestThemeShortcutCyclesThemes(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+	}
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.ThemeConfigPath = filepath.Join(dir, "theme.json")
+	model := NewModel(backend, cfg)
+	start := model.themeName
+
+	updated, cmd := model.Update(key("ctrl+v"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect a command when cycling theme")
+	}
+	if model.themeName == start {
+		t.Fatalf("theme did not change from %q", start)
+	}
+	if model.message != "theme: "+model.themeName {
+		t.Fatalf("theme message = %q, want theme announcement", model.message)
+	}
+	if _, err := os.Stat(cfg.ThemeConfigPath); err != nil {
+		t.Fatalf("theme config not written: %v", err)
+	}
+	stored, err := LoadThemeName(cfg.ThemeConfigPath)
+	if err != nil {
+		t.Fatalf("LoadThemeName: %v", err)
+	}
+	if stored != model.themeName {
+		t.Fatalf("stored theme = %q, want %q", stored, model.themeName)
+	}
+
+	for i := 1; i < len(visualThemes); i++ {
+		updated, _ = model.Update(key("ctrl+v"))
+		model = updated.(Model)
+	}
+	if model.themeName != start {
+		t.Fatalf("theme did not wrap back to %q, got %q", start, model.themeName)
 	}
 }
 
@@ -465,7 +508,8 @@ func TestViewRendersSearchSurface(t *testing.T) {
 		"> mas que nada",
 		"results for mas que nada",
 		"Mas Que Nada",
-		"ctrl+p playlists",
+		"theme aurora",
+		"ctrl+v",
 	} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("search view missing %q:\n%s", want, view)
@@ -496,6 +540,8 @@ func key(value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeySpace}
 	case "ctrl+p":
 		return tea.KeyMsg{Type: tea.KeyCtrlP}
+	case "ctrl+v":
+		return tea.KeyMsg{Type: tea.KeyCtrlV}
 	default:
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)}
 	}

@@ -15,75 +15,6 @@ const (
 	borderChrome   = 2
 )
 
-var (
-	colorInk      = lipgloss.Color("#F5F7FB")
-	colorMuted    = lipgloss.Color("#91A0B6")
-	colorSubtle   = lipgloss.Color("#56657A")
-	colorPanel    = lipgloss.Color("#222B3D")
-	colorPanelHi  = lipgloss.Color("#35435C")
-	colorAccent   = lipgloss.Color("#78E08F")
-	colorAccent2  = lipgloss.Color("#5ED6FF")
-	colorWarn     = lipgloss.Color("#FFB15C")
-	colorError    = lipgloss.Color("#FF758F")
-	colorSelected = lipgloss.Color("#FFD166")
-
-	baseStyle = lipgloss.NewStyle().
-			Foreground(colorInk).
-			Background(lipgloss.Color("#141C29"))
-
-	panelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorSubtle).
-			Background(colorPanel).
-			Padding(0, 2)
-
-	sidebarStyle = panelStyle.Copy().
-			BorderForeground(colorPanelHi).
-			Padding(1, 1)
-
-	titleStyle = lipgloss.NewStyle().
-			Foreground(colorInk).
-			Bold(true)
-
-	subtitleStyle = lipgloss.NewStyle().
-			Foreground(colorMuted)
-
-	labelStyle = lipgloss.NewStyle().
-			Foreground(colorMuted).
-			Transform(strings.ToUpper)
-
-	accentStyle = lipgloss.NewStyle().
-			Foreground(colorAccent).
-			Bold(true)
-
-	selectedStyle = lipgloss.NewStyle().
-			Foreground(colorInk).
-			Background(colorPanelHi).
-			Bold(true).
-			Padding(0, 1)
-
-	coverStyle = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
-			BorderForeground(colorAccent2).
-			Foreground(colorInk).
-			Background(lipgloss.Color("#1A2433")).
-			Padding(0, 2)
-
-	hintStyle = lipgloss.NewStyle().
-			Foreground(colorMuted)
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(colorError).
-			Bold(true)
-
-	messageStyle = lipgloss.NewStyle().
-			Foreground(colorWarn)
-
-	spinnerStyle = lipgloss.NewStyle().
-			Foreground(colorAccent2).
-			Bold(true)
-)
-
 func (m Model) renderApp() string {
 	width := m.width
 	if width <= 0 {
@@ -395,20 +326,32 @@ func (m Model) renderFooter(width int) string {
 	} else if m.message != "" {
 		status = messageStyle.Render(displayText(m.message, max(10, width-8)))
 	} else {
-		status = hintStyle.Render("q quit  tab switch  r refresh")
+		status = hintStyle.Render("q quit  tab switch  r refresh  ctrl+v theme")
 	}
 
+	theme := themePill(m.themeName)
+	if theme == "" {
+		theme = themePill(activeThemeName)
+	}
+	themeHint := hintStyle.Render("ctrl+v")
 	keys := "arrows/jk move  enter play  / search"
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
 	}
-	available := max(0, width-lipgloss.Width(status)-2)
-	keys = footerKeys(keys, available)
-	line := status
-	if keys != "" {
-		line = lipgloss.JoinHorizontal(lipgloss.Top, status, "  ", hintStyle.Render(keys))
+	themeWidth := 0
+	if theme != "" {
+		themeWidth = lipgloss.Width(theme) + lipgloss.Width(themeHint) + 1
 	}
-	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
+	available := max(0, width-lipgloss.Width(status)-themeWidth-4)
+	keys = footerKeys(keys, available)
+	segments := []string{status}
+	if keys != "" {
+		segments = append(segments, "    ", hintStyle.Render(keys))
+	}
+	if theme != "" && width-lipgloss.Width(status)-lipgloss.Width(keys)-4 > themeWidth {
+		segments = append(segments, "  ", theme, " ", themeHint)
+	}
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(lipgloss.JoinHorizontal(lipgloss.Top, segments...))
 }
 
 func footerKeys(value string, width int) string {
@@ -466,6 +409,19 @@ func (m Model) spinner() string {
 func keycap(key, label string) string {
 	keyStyle := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true)
 	return keyStyle.Render(key) + " " + subtitleStyle.Render(label)
+}
+
+func themePill(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	return lipgloss.NewStyle().
+		Padding(0, 1).
+		Bold(true).
+		Foreground(colorPanel).
+		Background(colorSelected).
+		Render("theme " + name)
 }
 
 func muteLabel(muted bool) string {
