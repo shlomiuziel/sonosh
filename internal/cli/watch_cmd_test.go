@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 type syncBuffer struct {

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 const defaultYouTubeFormat = "bestaudio[ext=m4a][acodec!=none]/bestaudio[acodec^=mp4a]/bestaudio[acodec!=none]/bestaudio"

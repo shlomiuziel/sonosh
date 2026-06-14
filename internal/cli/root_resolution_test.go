@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/appconfig"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/appconfig"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

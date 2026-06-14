@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/appconfig"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/appconfig"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 func TestRootCmdAppliesConfigDefaultsToFlags(t *testing.T) {

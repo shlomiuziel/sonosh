@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 func TestCompleteSMAPIAuth_NoWaitAttemptsOnce(t *testing.T) {

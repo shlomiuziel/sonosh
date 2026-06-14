@@ -117,18 +117,26 @@ func (c *Client) EnqueueSpotify(ctx context.Context, input string, opts EnqueueO
 		meta := buildShareDIDL(itemIDKey+ref.EncodedID, title, itemClass, serviceNum)
 		for _, enqueuedURI := range spotifyEnqueueURIs(ref.Kind, ref.EncodedID, serviceNum, uriPrefixes) {
 			slog.Debug("spotify: AddURIToQueue", "uri", enqueuedURI, "metadata", meta)
+			queueTotalBefore := -1
+			currentTrackBefore := -1
+			if opts.PlayNow && desiredPos == 0 {
+				if opts.AsNext {
+					if track, ok := c.currentQueueTrack(ctx); ok {
+						currentTrackBefore = track
+					}
+				} else if total, ok := c.queueTotal(ctx); ok {
+					queueTotalBefore = total
+				}
+			}
 			first, err := c.AddURIToQueue(ctx, enqueuedURI, meta, desiredPos, opts.AsNext)
 			if err != nil {
 				lastErr = err
 				continue
 			}
-			if opts.PlayNow && first > 0 {
-				if err := c.playFromQueueTrack(ctx, first); err != nil {
+			if opts.PlayNow {
+				if err := c.playEnqueuedTrack(ctx, first, desiredPos, queueTotalBefore, currentTrackBefore, opts.AsNext); err != nil {
 					return first, err
 				}
-			} else if opts.PlayNow {
-				// If the speaker doesn't report a first track number, just call Play.
-				_ = c.Play(ctx)
 			}
 			return first, nil
 		}

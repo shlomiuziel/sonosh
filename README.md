@@ -1,4 +1,18 @@
-# 🔊 sonoscli — Discover, group, and control Sonos
+# sonosh - Sonos TUI and CLI
+
+`sonosh` is a Go terminal UI for discovering and controlling Sonos speakers on
+your local network. It is fork-derived from
+[`steipete/sonoscli`](https://github.com/steipete/sonoscli), keeping the mature
+Sonos discovery/control internals while adding a Bubble Tea TUI.
+
+The `sonosh` TUI currently supports:
+
+- room discovery and room selection
+- now-playing, volume, and mute status
+- play/pause, stop, next, previous, volume, and mute controls
+- Spotify/SMAPI search through linked Sonos music services
+
+The inherited `sonos` CLI is still available while the TUI grows.
 
 `sonoscli` is a modern Go CLI to control Sonos speakers over your local network (UPnP/SOAP).
 
@@ -68,17 +82,36 @@ brew upgrade steipete/tap/sonoscli
 Install from source (Go):
 
 ```bash
-go install github.com/steipete/sonoscli/cmd/sonos@latest
-sonos --version
+go install github.com/shlomiuziel/sonosh/cmd/sonosh@latest
+sonosh
 ```
 
-Build a local binary:
+Build the TUI locally:
+
+```bash
+go build -o sonosh ./cmd/sonosh
+./sonosh
+```
+
+Build the inherited CLI locally:
 
 ```bash
 go build -o sonos ./cmd/sonos
 ./sonos --version
-./sonos --help
 ```
+
+Useful TUI keys:
+
+- `up`/`down` or `k`/`j`: move selection
+- `space`: play/pause
+- `s`: stop
+- `n` / `p`: next / previous
+- `+` / `-`: volume
+- `m`: mute
+- `/` or `tab`: search
+- `enter`: search or play selected result
+- `r`: refresh
+- `q`: quit
 
 Docker:
 

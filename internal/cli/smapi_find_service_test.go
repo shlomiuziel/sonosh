@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 func TestFindServiceByName(t *testing.T) {

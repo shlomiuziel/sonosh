@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/appconfig"
+	"github.com/shlomiuziel/sonosh/internal/appconfig"
 )
 
 func TestConfigSetGetUnset(t *testing.T) {

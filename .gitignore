@@ -28,6 +28,7 @@ yarn-error.log*
 /build/
 /out/
 /tmp/
+**/.build/
 
 # Test binary, built with `go test -c`
 *.test

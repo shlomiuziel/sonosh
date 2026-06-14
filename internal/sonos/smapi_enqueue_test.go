@@ -43,6 +43,29 @@ func TestEnqueueSMAPIItem(t *testing.T) {
   </s:Body>
 </s:Envelope>`), nil
 			}
+			if strings.Contains(action, "ContentDirectory:1#Browse") || strings.Contains(string(body), "Browse") {
+				return httpResponse(200, `<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <u:BrowseResponse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1">
+      <Result></Result>
+      <NumberReturned>1</NumberReturned>
+      <TotalMatches>3</TotalMatches>
+      <UpdateID>1</UpdateID>
+    </u:BrowseResponse>
+  </s:Body>
+</s:Envelope>`), nil
+			}
+			if strings.Contains(action, "GetPositionInfo") || strings.Contains(string(body), "GetPositionInfo") {
+				return httpResponse(200, `<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <u:GetPositionInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+      <Track>3</Track>
+    </u:GetPositionInfoResponse>
+  </s:Body>
+</s:Envelope>`), nil
+			}
 			if strings.Contains(action, "SetAVTransportURI") || strings.Contains(action, "Seek") || strings.Contains(action, "Play") ||
 				strings.Contains(string(body), "SetAVTransportURI") || strings.Contains(string(body), "Seek") || strings.Contains(string(body), "Play") {
 				return httpResponse(200, `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:OK xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"></u:OK></s:Body></s:Envelope>`), nil

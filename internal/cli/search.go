@@ -8,8 +8,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"github.com/steipete/sonoscli/internal/sonos"
-	"github.com/steipete/sonoscli/internal/spotify"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/spotify"
 )
 
 type spotifySearcher interface {

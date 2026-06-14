@@ -38,16 +38,25 @@ func (c *Client) EnqueueSMAPIItem(ctx context.Context, svc MusicServiceDescripto
 	meta := buildSMAPIDIDL(didlItemID, enqueuedURI, smapiServiceDesc(svc))
 	slog.Debug("smapi: AddURIToQueue", "service", svc.Name, "uri", enqueuedURI, "metadata", meta, "title", title)
 
+	queueTotalBefore := -1
+	currentTrackBefore := -1
+	if opts.PlayNow && desiredPos == 0 {
+		if opts.AsNext {
+			if track, ok := c.currentQueueTrack(ctx); ok {
+				currentTrackBefore = track
+			}
+		} else if total, ok := c.queueTotal(ctx); ok {
+			queueTotalBefore = total
+		}
+	}
 	first, err := c.AddURIToQueue(ctx, enqueuedURI, meta, desiredPos, opts.AsNext)
 	if err != nil {
 		return 0, err
 	}
-	if opts.PlayNow && first > 0 {
-		if err := c.playFromQueueTrack(ctx, first); err != nil {
+	if opts.PlayNow {
+		if err := c.playEnqueuedTrack(ctx, first, desiredPos, queueTotalBefore, currentTrackBefore, opts.AsNext); err != nil {
 			return first, err
 		}
-	} else if opts.PlayNow {
-		_ = c.Play(ctx)
 	}
 	return first, nil
 }

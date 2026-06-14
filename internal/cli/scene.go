@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steipete/sonoscli/internal/scenes"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/scenes"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 type sceneTopologyGetter interface {

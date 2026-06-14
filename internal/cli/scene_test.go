@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/scenes"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/scenes"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 type fakeSceneStore struct {

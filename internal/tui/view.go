@@ -1,0 +1,471 @@
+package tui
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	minWidth       = 72
+	sidebarWidth   = 28
+	compactAtWidth = 92
+	borderChrome   = 2
+)
+
+var (
+	colorInk      = lipgloss.Color("#EAF0F6")
+	colorMuted    = lipgloss.Color("#77818F")
+	colorSubtle   = lipgloss.Color("#3C4654")
+	colorPanel    = lipgloss.Color("#1E2633")
+	colorPanelHi  = lipgloss.Color("#2A3445")
+	colorAccent   = lipgloss.Color("#68D391")
+	colorAccent2  = lipgloss.Color("#7DD3FC")
+	colorWarn     = lipgloss.Color("#F6AD55")
+	colorError    = lipgloss.Color("#FC8181")
+	colorSelected = lipgloss.Color("#D6BCFA")
+
+	baseStyle = lipgloss.NewStyle().
+			Foreground(colorInk).
+			Background(lipgloss.Color("#111722"))
+
+	panelStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorSubtle).
+			Background(colorPanel).
+			Padding(0, 2)
+
+	sidebarStyle = panelStyle.Copy().
+			BorderForeground(colorPanelHi).
+			Padding(1, 1)
+
+	titleStyle = lipgloss.NewStyle().
+			Foreground(colorInk).
+			Bold(true)
+
+	subtitleStyle = lipgloss.NewStyle().
+			Foreground(colorMuted)
+
+	labelStyle = lipgloss.NewStyle().
+			Foreground(colorMuted).
+			Transform(strings.ToUpper)
+
+	accentStyle = lipgloss.NewStyle().
+			Foreground(colorAccent).
+			Bold(true)
+
+	selectedStyle = lipgloss.NewStyle().
+			Foreground(colorInk).
+			Background(colorPanelHi).
+			Bold(true).
+			Padding(0, 1)
+
+	coverStyle = lipgloss.NewStyle().
+			Align(lipgloss.Center).
+			Border(lipgloss.ThickBorder()).
+			BorderForeground(colorAccent2).
+			Foreground(colorInk).
+			Background(lipgloss.Color("#17202E")).
+			Padding(0, 2)
+
+	hintStyle = lipgloss.NewStyle().
+			Foreground(colorMuted)
+
+	errorStyle = lipgloss.NewStyle().
+			Foreground(colorError).
+			Bold(true)
+
+	messageStyle = lipgloss.NewStyle().
+			Foreground(colorWarn)
+
+	spinnerStyle = lipgloss.NewStyle().
+			Foreground(colorAccent2).
+			Bold(true)
+)
+
+func (m Model) renderApp() string {
+	width := m.width
+	if width <= 0 {
+		width = 100
+	}
+	if width < minWidth {
+		width = minWidth
+	}
+
+	contentWidth := width - 2
+	body := m.renderBody(contentWidth)
+	footer := m.renderFooter(contentWidth)
+
+	view := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	return baseStyle.Width(width).Render(view)
+}
+
+func (m Model) renderBody(width int) string {
+	if width < compactAtWidth {
+		sections := []string{
+			m.renderHeader(width),
+			m.renderNowPlaying(width),
+			m.renderRooms(width),
+		}
+		if search := m.renderSearchIfActive(width); search != "" {
+			sections = append(sections, search)
+		}
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			sections...,
+		)
+	}
+
+	left := m.renderRooms(sidebarWidth)
+	rightWidth := width - sidebarWidth - 2
+	right := lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.renderHeader(rightWidth),
+		m.renderNowPlaying(rightWidth),
+		m.renderSearchIfActive(rightWidth),
+	)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right)
+}
+
+func (m Model) renderHeader(width int) string {
+	state := normalizeState(m.status.State)
+	room := "No room"
+	if len(m.rooms) > 0 {
+		room = m.selectedRoom().Name
+	}
+
+	status := state
+	if m.loading {
+		status = status + " / syncing"
+	}
+	statusView := statusPill(status)
+	if m.loading {
+		statusView = lipgloss.JoinHorizontal(lipgloss.Center, spinnerStyle.Render(m.spinner()), " ", statusView)
+	}
+	line := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		accentStyle.Render("sonosh"),
+		"  ",
+		subtitleStyle.Render(truncate(room, max(12, width/3))),
+		"  ",
+		statusView,
+	)
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
+}
+
+func (m Model) renderRooms(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	var lines []string
+	lines = append(lines, labelStyle.Render("Rooms"))
+	if len(m.rooms) == 0 {
+		lines = append(lines, subtitleStyle.Render("No rooms found"))
+		lines = append(lines, hintStyle.Render("Press r to discover"))
+		return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
+	}
+
+	for i, room := range m.rooms {
+		nameWidth := max(8, contentWidth-4)
+		name := truncate(room.Name, nameWidth)
+		members := truncate(strings.Join(room.GroupMembers, ", "), nameWidth)
+		if members == "" {
+			members = room.IP
+		}
+		row := fmt.Sprintf("%s\n%s", titleStyle.Render(name), subtitleStyle.Render(members))
+		if i == m.roomIndex {
+			row = selectedStyle.Width(max(1, contentWidth-4)).Render(row)
+		} else {
+			row = lipgloss.NewStyle().Padding(0, 1).Render(row)
+		}
+		lines = append(lines, row)
+	}
+
+	return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderNowPlaying(width int) string {
+	innerWidth := max(24, width-6)
+	coverWidth := 22
+	detailsWidth := innerWidth - coverWidth - 3
+	if width < compactAtWidth {
+		coverWidth = min(28, innerWidth)
+		detailsWidth = innerWidth
+	}
+
+	cover := m.renderCover(coverWidth)
+	details := m.renderTrackDetails(detailsWidth)
+
+	var content string
+	if width < compactAtWidth {
+		content = lipgloss.JoinVertical(lipgloss.Center, cover, details)
+	} else {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, cover, "   ", details)
+	}
+	return panelStyle.Width(max(1, width-borderChrome)).Render(content)
+}
+
+func (m Model) renderCover(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	title := empty(m.status.Title, "No Track")
+	artist := empty(m.status.Artist, "sonosh")
+	initials := coverInitials(title, artist)
+	albumLine := truncate(empty(m.status.Album, "Sonos"), max(8, contentWidth-4))
+	artHint := ""
+	if m.status.AlbumArt != "" {
+		artHint = "\n" + subtitleStyle.Render("art linked")
+	}
+
+	coverText := strings.Join([]string{
+		labelStyle.Render("Now Playing"),
+		lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render(initials),
+		subtitleStyle.Render(albumLine),
+	}, "\n") + artHint
+
+	return coverStyle.Width(contentWidth).Height(10).Render(coverText)
+}
+
+func (m Model) renderTrackDetails(width int) string {
+	progressLabel := fmt.Sprintf("%s / %s", empty(m.status.Position, "--:--"), empty(m.status.Duration, "--:--"))
+	progress := renderBar(progressRatio(m.status.Position, m.status.Duration), max(8, width-lipgloss.Width(progressLabel)-3), colorAccent)
+	volumeLabel := fmt.Sprintf("%3d%%  %s", clamp(m.status.Volume, 0, 100), muteLabel(m.status.Muted))
+	volume := renderBar(float64(clamp(m.status.Volume, 0, 100))/100, max(8, width-lipgloss.Width(volumeLabel)-3), colorAccent2)
+
+	title := titleStyle.
+		Foreground(colorInk).
+		Bold(true).
+		Render(truncate(empty(m.status.Title, "Nothing playing"), width))
+	artist := subtitleStyle.Render(truncate(empty(m.status.Artist, "Unknown artist"), width))
+	album := subtitleStyle.Render(truncate(empty(m.status.Album, "Unknown album"), width))
+
+	rows := []string{
+		labelStyle.Render("Track"),
+		title,
+		artist,
+		album,
+		"",
+		fmt.Sprintf("%s  %s", progress, progressLabel),
+		fmt.Sprintf("%s  %s", volume, volumeLabel),
+		"",
+		m.renderTransport(width),
+	}
+	return lipgloss.NewStyle().Width(width).Render(strings.Join(rows, "\n"))
+}
+
+func (m Model) renderTransport(width int) string {
+	play := "Play"
+	if strings.EqualFold(m.status.State, "PLAYING") {
+		play = "Pause"
+	}
+	controls := []string{
+		keycap("space", play),
+		keycap("p", "Prev"),
+		keycap("n", "Next"),
+		keycap("s", "Stop"),
+		keycap("+/-", "Vol"),
+		keycap("m", "Mute"),
+		keycap("/", "Search"),
+	}
+	line := strings.Join(controls, "  ")
+	return truncate(line, width)
+}
+
+func (m Model) renderSearchIfActive(width int) string {
+	if m.mode != modeSearch {
+		return ""
+	}
+	return m.renderSearchPanel(width)
+}
+
+func (m Model) renderSearchPanel(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	var lines []string
+	query := m.searchQuery
+	if query == "" {
+		query = "type to search..."
+	}
+	lines = append(lines, lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		labelStyle.Render(m.config.SearchService+" / "+m.searchCategory),
+		"  ",
+		accentStyle.Render("> "+truncate(query, max(10, width-24))),
+	))
+
+	if m.searchPreviewQuery != "" && m.searchPreviewQuery != m.searchQuery {
+		lines = append(lines, subtitleStyle.Render("updating results for "+m.searchQuery))
+	} else if m.searchPreviewQuery != "" {
+		lines = append(lines, subtitleStyle.Render("results for "+m.searchPreviewQuery))
+	}
+
+	if len(m.searchItems) == 0 {
+		lines = append(lines, "")
+		lines = append(lines, hintStyle.Render("Search results will appear here"))
+	} else {
+		limit := min(len(m.searchItems), 8)
+		for i := 0; i < limit; i++ {
+			item := m.searchItems[i]
+			row := fmt.Sprintf("%2d  %-9s  %s", i+1, truncate(item.Item.ItemType, 9), truncate(item.Title(), max(8, contentWidth-18)))
+			if i == m.searchIndex {
+				row = selectedStyle.Width(max(1, contentWidth-4)).Render(row)
+			} else {
+				row = lipgloss.NewStyle().PaddingLeft(1).Render(row)
+			}
+			lines = append(lines, row)
+		}
+		if len(m.searchItems) > limit {
+			lines = append(lines, subtitleStyle.Render(fmt.Sprintf("+%d more", len(m.searchItems)-limit)))
+		}
+	}
+
+	return panelStyle.BorderForeground(colorSelected).Width(contentWidth).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderFooter(width int) string {
+	var status string
+	if m.err != nil {
+		status = errorStyle.Render("Error: " + truncate(m.err.Error(), max(10, width-8)))
+	} else if m.loading {
+		status = accentStyle.Render(m.spinner() + " loading")
+	} else if m.message != "" {
+		status = messageStyle.Render(truncate(m.message, max(10, width-8)))
+	} else {
+		status = hintStyle.Render("q quit  tab switch  r refresh")
+	}
+
+	keys := "arrows/jk move  enter play  / search"
+	if m.mode == modeSearch {
+		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
+	}
+	line := lipgloss.JoinHorizontal(lipgloss.Top, status, lipgloss.NewStyle().Width(max(1, width-lipgloss.Width(status)-lipgloss.Width(keys))).Render(""), hintStyle.Render(keys))
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
+}
+
+func statusPill(state string) string {
+	state = truncate(empty(state, "idle"), 18)
+	style := lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(lipgloss.Color("#101820"))
+	switch strings.ToLower(state) {
+	case "playing":
+		return style.Background(colorAccent).Render(state)
+	case "paused", "paused playback":
+		return style.Background(colorWarn).Render(state)
+	default:
+		return style.Background(colorSubtle).Foreground(colorInk).Render(state)
+	}
+}
+
+func (m Model) spinner() string {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	return frames[m.spinnerFrame%len(frames)]
+}
+
+func keycap(key, label string) string {
+	keyStyle := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true)
+	return keyStyle.Render(key) + " " + subtitleStyle.Render(label)
+}
+
+func muteLabel(muted bool) string {
+	if muted {
+		return "muted"
+	}
+	return "live"
+}
+
+func renderBar(ratio float64, width int, color lipgloss.Color) string {
+	width = max(4, width)
+	ratio = maxFloat(0, minFloat(1, ratio))
+	filled := int(ratio * float64(width))
+	if ratio > 0 && filled == 0 {
+		filled = 1
+	}
+	return lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("━", filled)) +
+		lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("─", width-filled))
+}
+
+func progressRatio(position, duration string) float64 {
+	pos, okPos := parseClock(position)
+	dur, okDur := parseClock(duration)
+	if !okPos || !okDur || dur <= 0 {
+		return 0
+	}
+	return float64(pos) / float64(dur)
+}
+
+func parseClock(value string) (int, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "NOT_IMPLEMENTED" {
+		return 0, false
+	}
+	parts := strings.Split(value, ":")
+	total := 0
+	for _, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return 0, false
+		}
+		total = total*60 + n
+	}
+	return total, true
+}
+
+func coverInitials(title, artist string) string {
+	var initials []string
+	for _, word := range strings.Fields(title + " " + artist) {
+		r := []rune(word)
+		if len(r) == 0 {
+			continue
+		}
+		initials = append(initials, strings.ToUpper(string(r[0])))
+		if len(initials) == 2 {
+			break
+		}
+	}
+	if len(initials) == 0 {
+		return "SO"
+	}
+	return strings.Join(initials, " ")
+}
+
+func truncate(value string, width int) string {
+	value = strings.TrimSpace(value)
+	if width <= 0 || lipgloss.Width(value) <= width {
+		return value
+	}
+	if width <= 1 {
+		return "…"
+	}
+	runes := []rune(value)
+	for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > width {
+		runes = runes[:len(runes)-1]
+	}
+	return string(runes) + "…"
+}
+
+func normalizeState(state string) string {
+	state = strings.TrimSpace(strings.ToLower(state))
+	state = strings.ReplaceAll(state, "_", " ")
+	if state == "" {
+		return "idle"
+	}
+	return state
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}

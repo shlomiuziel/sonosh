@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 type QueueItem struct {
@@ -70,6 +71,41 @@ func (c *Client) PlayQueuePosition(ctx context.Context, position int) error {
 // playback at the given 1-based track number.
 func (c *Client) PlayFromQueueTrack(ctx context.Context, oneBasedTrackNumber int) error {
 	return c.playFromQueueTrack(ctx, oneBasedTrackNumber)
+}
+
+func (c *Client) queueTotal(ctx context.Context) (int, bool) {
+	page, err := c.ListQueue(ctx, 0, 1)
+	if err != nil || page.TotalMatches < 0 {
+		return 0, false
+	}
+	return page.TotalMatches, true
+}
+
+func (c *Client) currentQueueTrack(ctx context.Context) (int, bool) {
+	position, err := c.GetPositionInfo(ctx)
+	if err != nil {
+		return 0, false
+	}
+	track, err := strconv.Atoi(position.Track)
+	if err != nil || track <= 0 {
+		return 0, false
+	}
+	return track, true
+}
+
+func (c *Client) playEnqueuedTrack(ctx context.Context, firstTrackNumber, desiredPosition, queueTotalBefore, currentTrackBefore int, enqueueAsNext bool) error {
+	switch {
+	case firstTrackNumber > 0:
+		return c.playFromQueueTrack(ctx, firstTrackNumber)
+	case desiredPosition > 0:
+		return c.playFromQueueTrack(ctx, desiredPosition)
+	case enqueueAsNext && currentTrackBefore > 0:
+		return c.playFromQueueTrack(ctx, currentTrackBefore+1)
+	case !enqueueAsNext && queueTotalBefore >= 0:
+		return c.playFromQueueTrack(ctx, queueTotalBefore+1)
+	default:
+		return c.Play(ctx)
+	}
 }
 
 func (c *Client) playFromQueueTrack(ctx context.Context, oneBasedTrackNumber int) error {

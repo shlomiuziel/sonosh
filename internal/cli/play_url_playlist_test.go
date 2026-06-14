@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/steipete/sonoscli/internal/streamproxy"
+	"github.com/shlomiuziel/sonosh/internal/streamproxy"
 )
 
 type fakePlaylistClient struct {

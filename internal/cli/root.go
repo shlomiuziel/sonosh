@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/steipete/sonoscli/internal/appconfig"
-	"github.com/steipete/sonoscli/internal/sonos"
+	"github.com/shlomiuziel/sonosh/internal/appconfig"
+	"github.com/shlomiuziel/sonosh/internal/sonos"
 )
 
 type rootFlags struct {

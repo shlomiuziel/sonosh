@@ -50,6 +50,8 @@ func TestClientEnqueueSpotify_PlayNowTrack(t *testing.T) {
 			body := string(b)
 
 			switch {
+			case strings.Contains(action, "ContentDirectory:1#Browse"):
+				return httpResponse(200, soapResp("Browse", "<NumberReturned>1</NumberReturned><TotalMatches>6</TotalMatches><UpdateID>1</UpdateID>")), nil
 			case strings.Contains(action, "#AddURIToQueue"):
 				addCalls++
 				if !strings.Contains(body, "<EnqueuedURI>x-sonos-spotify:spotify%3atrack%3aabc123?sid=2311&amp;sn=0</EnqueuedURI>") {
@@ -104,6 +106,157 @@ func TestClientEnqueueSpotify_PlayNowTrack(t *testing.T) {
 	}
 	if addCalls != 1 {
 		t.Fatalf("expected exactly 1 AddURIToQueue call, got %d", addCalls)
+	}
+}
+
+func TestClientEnqueueSpotify_PlayNowFallsBackToAppendedQueuePosition(t *testing.T) {
+	t.Parallel()
+
+	deviceDescriptionXML := `<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:ZonePlayer:1</deviceType>
+    <roomName>Office</roomName>
+    <manufacturer>Sonos</manufacturer>
+    <UDN>uuid:RINCON_ABC1400</UDN>
+  </device>
+</root>`
+
+	soapResp := func(action string, inner string) string {
+		return `<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <u:` + action + `Response xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">` + inner + `</u:` + action + `Response>
+  </s:Body>
+</s:Envelope>`
+	}
+
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodGet {
+			return httpResponse(200, deviceDescriptionXML), nil
+		}
+
+		action := r.Header.Get("SOAPACTION")
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		body := string(bodyBytes)
+
+		switch {
+		case strings.Contains(action, "ContentDirectory:1#Browse"):
+			return httpResponse(200, soapResp("Browse", "<NumberReturned>1</NumberReturned><TotalMatches>5</TotalMatches><UpdateID>1</UpdateID>")), nil
+		case strings.Contains(action, "#AddURIToQueue"):
+			return httpResponse(200, soapResp("AddURIToQueue", "")), nil
+		case strings.Contains(action, "#SetAVTransportURI"):
+			if !strings.Contains(body, "<CurrentURI>x-rincon-queue:RINCON_ABC1400#0</CurrentURI>") {
+				t.Fatalf("expected queue URI, body: %s", body)
+			}
+			return httpResponse(200, soapResp("SetAVTransportURI", "")), nil
+		case strings.Contains(action, "#Seek"):
+			if !strings.Contains(body, "<Target>6</Target>") {
+				t.Fatalf("expected fallback seek to appended position 6, body: %s", body)
+			}
+			return httpResponse(200, soapResp("Seek", "")), nil
+		case strings.Contains(action, "#Play"):
+			return httpResponse(200, soapResp("Play", "")), nil
+		default:
+			t.Fatalf("unexpected SOAPACTION %q", action)
+			return nil, nil
+		}
+	})
+
+	c := &Client{
+		IP: "192.0.2.1",
+		HTTP: &http.Client{
+			Timeout:   time.Second,
+			Transport: rt,
+		},
+	}
+
+	first, err := c.EnqueueSpotify(context.Background(), "spotify:track:abc123", EnqueueOptions{
+		Title:   "Fallback",
+		PlayNow: true,
+	})
+	if err != nil {
+		t.Fatalf("EnqueueSpotify: %v", err)
+	}
+	if first != 0 {
+		t.Fatalf("FirstTrackNumberEnqueued: %d, want 0", first)
+	}
+}
+
+func TestClientEnqueueSpotify_PlayNowAsNextFallsBackToCurrentQueuePosition(t *testing.T) {
+	t.Parallel()
+
+	deviceDescriptionXML := `<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:ZonePlayer:1</deviceType>
+    <roomName>Office</roomName>
+    <manufacturer>Sonos</manufacturer>
+    <UDN>uuid:RINCON_ABC1400</UDN>
+  </device>
+</root>`
+
+	soapResp := func(action string, inner string) string {
+		return `<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <u:` + action + `Response xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">` + inner + `</u:` + action + `Response>
+  </s:Body>
+</s:Envelope>`
+	}
+
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodGet {
+			return httpResponse(200, deviceDescriptionXML), nil
+		}
+
+		action := r.Header.Get("SOAPACTION")
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		body := string(bodyBytes)
+
+		switch {
+		case strings.Contains(action, "#GetPositionInfo"):
+			return httpResponse(200, soapResp("GetPositionInfo", "<Track>4</Track>")), nil
+		case strings.Contains(action, "#AddURIToQueue"):
+			if !strings.Contains(body, "<EnqueueAsNext>1</EnqueueAsNext>") {
+				t.Fatalf("expected EnqueueAsNext=1, body: %s", body)
+			}
+			return httpResponse(200, soapResp("AddURIToQueue", "")), nil
+		case strings.Contains(action, "#SetAVTransportURI"):
+			return httpResponse(200, soapResp("SetAVTransportURI", "")), nil
+		case strings.Contains(action, "#Seek"):
+			if !strings.Contains(body, "<Target>5</Target>") {
+				t.Fatalf("expected fallback seek to current+1 position 5, body: %s", body)
+			}
+			return httpResponse(200, soapResp("Seek", "")), nil
+		case strings.Contains(action, "#Play"):
+			return httpResponse(200, soapResp("Play", "")), nil
+		default:
+			t.Fatalf("unexpected SOAPACTION %q", action)
+			return nil, nil
+		}
+	})
+
+	c := &Client{
+		IP: "192.0.2.1",
+		HTTP: &http.Client{
+			Timeout:   time.Second,
+			Transport: rt,
+		},
+	}
+
+	first, err := c.EnqueueSpotify(context.Background(), "spotify:track:abc123", EnqueueOptions{
+		Title:   "AsNext",
+		AsNext:  true,
+		PlayNow: true,
+	})
+	if err != nil {
+		t.Fatalf("EnqueueSpotify: %v", err)
+	}
+	if first != 0 {
+		t.Fatalf("FirstTrackNumberEnqueued: %d, want 0", first)
 	}
 }
 
