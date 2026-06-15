@@ -147,6 +147,7 @@ func applyTheme(name string) string {
 	panelStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorSubtle).
+		Background(colorPanel).
 		Padding(0, 2)
 
 	sidebarStyle = panelStyle.Copy().
@@ -155,21 +156,26 @@ func applyTheme(name string) string {
 
 	titleStyle = lipgloss.NewStyle().
 		Foreground(colorInk).
+		Background(colorPanel).
 		Bold(true)
 
 	subtitleStyle = lipgloss.NewStyle().
-		Foreground(colorMuted)
+		Foreground(colorMuted).
+		Background(colorPanel)
 
 	labelStyle = lipgloss.NewStyle().
 		Foreground(colorMuted).
+		Background(colorPanel).
 		Transform(strings.ToUpper)
 
 	accentStyle = lipgloss.NewStyle().
 		Foreground(colorAccent).
+		Background(colorPanel).
 		Bold(true)
 
 	selectedStyle = lipgloss.NewStyle().
 		Foreground(colorSelected).
+		Background(colorPanel).
 		Bold(true).
 		Padding(0, 1)
 
@@ -177,24 +183,30 @@ func applyTheme(name string) string {
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(colorAccent2).
 		Foreground(colorInk).
+		Background(colorPanel).
 		Padding(0, 2)
 
 	trackStyle = lipgloss.NewStyle().
 		Foreground(colorInk).
+		Background(colorPanel).
 		Padding(1, 2)
 
 	hintStyle = lipgloss.NewStyle().
-		Foreground(colorMuted)
+		Foreground(colorMuted).
+		Background(colorPanel)
 
 	errorStyle = lipgloss.NewStyle().
 		Foreground(colorError).
+		Background(colorPanel).
 		Bold(true)
 
 	messageStyle = lipgloss.NewStyle().
-		Foreground(colorWarn)
+		Foreground(colorWarn).
+		Background(colorPanel)
 
 	spinnerStyle = lipgloss.NewStyle().
 		Foreground(colorAccent2).
+		Background(colorPanel).
 		Bold(true)
 
 	return activeThemeName

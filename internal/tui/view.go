@@ -87,9 +87,9 @@ func (m Model) renderHeaderContent(width int) string {
 	line := lipgloss.JoinHorizontal(
 		lipgloss.Center,
 		accentStyle.Render("sonosh"),
-		"  ",
+		paneSpace(2),
 		subtitleStyle.Render(displayText(room, max(12, width/3))),
-		"  ",
+		paneSpace(2),
 		statusView,
 	)
 	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
@@ -147,7 +147,10 @@ func (m Model) renderNowPlayingContent(width int) string {
 		content = lipgloss.JoinVertical(lipgloss.Center, cover, details)
 	} else {
 		cover := m.renderCover(coverWidth)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, cover, "   ", details)
+		rowHeight := max(lipgloss.Height(cover), lipgloss.Height(details))
+		cover = paneBlock(lipgloss.Width(cover), rowHeight).Render(cover)
+		details = paneBlock(lipgloss.Width(details), rowHeight).Render(details)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, cover, paneBlock(3, rowHeight).Render(""), details)
 	}
 	return content
 }
@@ -174,7 +177,7 @@ func (m Model) renderCover(width int) string {
 	artist := empty(m.status.Artist, "sonosh")
 	initials := coverInitials(title, artist)
 	albumLine := displayText(empty(m.status.Album, "Sonos"), max(8, innerWidth))
-	coverArt := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true).Render(initials)
+	coverArt := lipgloss.NewStyle().Foreground(colorAccent2).Background(colorPanel).Bold(true).Render(initials)
 	centerArt := true
 	if strings.TrimSpace(m.artView) != "" && m.artURL == strings.TrimSpace(m.status.AlbumArt) {
 		coverArt = renderCoverArt(innerWidth, m.artView)
@@ -253,8 +256,8 @@ func (m Model) renderTrackDetails(width int) string {
 		artist,
 		album,
 		"",
-		fmt.Sprintf("%s  %s", progress, progressLabel),
-		fmt.Sprintf("%s  %s", volume, volumeLabel),
+		lipgloss.JoinHorizontal(lipgloss.Top, progress, paneSpace(2), paneText(progressLabel)),
+		lipgloss.JoinHorizontal(lipgloss.Top, volume, paneSpace(2), paneText(volumeLabel)),
 		"",
 		m.renderTransport(contentWidth),
 	}
@@ -275,7 +278,7 @@ func (m Model) renderTransport(width int) string {
 		keycap("m", "Mute"),
 		keycap("/", "Search"),
 	}
-	line := strings.Join(controls, "  ")
+	line := strings.Join(controls, paneSpace(2))
 	return truncate(line, width)
 }
 
@@ -382,7 +385,7 @@ func selectedRoomRow(name, members string, width int) string {
 	contentWidth := max(1, width-lipgloss.Width("▸"))
 	textWidth := max(1, contentWidth-selectedStyle.GetHorizontalPadding())
 	nameLine := accentStyle.Render("▸") + selectedStyle.Width(contentWidth).Render(displayText(name, textWidth))
-	memberLine := " " + subtitleStyle.Foreground(colorSelected).Bold(true).Render(displayText(members, contentWidth))
+	memberLine := paneSpace(1) + subtitleStyle.Foreground(colorSelected).Background(colorPanel).Bold(true).Render(displayText(members, contentWidth))
 	return lipgloss.NewStyle().Width(width).Render(nameLine + "\n" + memberLine)
 }
 
@@ -417,18 +420,18 @@ func (m Model) renderFooterContent(width int) string {
 	if m.err != nil {
 		status = errorStyle.Render("Error: " + displayText(m.err.Error(), max(10, width-8)))
 	} else if m.loading {
-		status = accentStyle.Render(m.spinner() + " loading")
+		status = footerMessageStyle().Render(m.spinner() + " loading")
 	} else if m.message != "" {
-		status = messageStyle.Render(displayText(m.message, max(10, width-8)))
+		status = footerMessageStyle().Render(displayText(m.message, max(10, width-8)))
 	} else {
-		status = hintStyle.Render("q quit  tab switch  r refresh  ctrl+v theme")
+		status = footerHintStyle().Render("q quit  tab switch  r refresh  ctrl+v theme")
 	}
 
 	theme := themePill(m.themeName)
 	if theme == "" {
 		theme = themePill(activeThemeName)
 	}
-	themeHint := hintStyle.Render("ctrl+v")
+	themeHint := footerHintStyle().Render("ctrl+v")
 	keys := "arrows/jk move  enter play  / search"
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
@@ -441,7 +444,7 @@ func (m Model) renderFooterContent(width int) string {
 	keys = footerKeys(keys, available)
 	segments := []string{status}
 	if keys != "" {
-		segments = append(segments, "    ", hintStyle.Render(keys))
+		segments = append(segments, "    ", footerHintStyle().Render(keys))
 	}
 	if theme != "" && width-lipgloss.Width(status)-lipgloss.Width(keys)-4 > themeWidth {
 		segments = append(segments, "  ", theme, " ", themeHint)
@@ -510,6 +513,7 @@ func statusPill(state string) string {
 			Padding(0, 1).
 			Bold(true).
 			Foreground(colorMuted).
+			Background(colorPanel).
 			Render(state)
 	}
 }
@@ -520,8 +524,37 @@ func (m Model) spinner() string {
 }
 
 func keycap(key, label string) string {
-	keyStyle := lipgloss.NewStyle().Foreground(colorAccent2).Bold(true)
-	return keyStyle.Render(key) + " " + subtitleStyle.Render(label)
+	keyStyle := lipgloss.NewStyle().Foreground(colorAccent2).Background(colorPanel).Bold(true)
+	return keyStyle.Render(key) + paneSpace(1) + subtitleStyle.Render(label)
+}
+
+func paneSpace(width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().Background(colorPanel).Render(strings.Repeat(" ", width))
+}
+
+func paneBlock(width, height int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Width(max(1, width)).
+		Height(max(1, height)).
+		Background(colorPanel)
+}
+
+func paneText(value string) string {
+	return lipgloss.NewStyle().
+		Foreground(colorInk).
+		Background(colorPanel).
+		Render(value)
+}
+
+func footerHintStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(colorMuted)
+}
+
+func footerMessageStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(colorWarn)
 }
 
 func themePill(name string) string {
@@ -551,8 +584,8 @@ func renderBar(ratio float64, width int, color lipgloss.Color) string {
 	if ratio > 0 && filled == 0 {
 		filled = 1
 	}
-	return lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("━", filled)) +
-		lipgloss.NewStyle().Foreground(colorSubtle).Render(strings.Repeat("─", width-filled))
+	return lipgloss.NewStyle().Foreground(color).Background(colorPanel).Render(strings.Repeat("━", filled)) +
+		lipgloss.NewStyle().Foreground(colorSubtle).Background(colorPanel).Render(strings.Repeat("─", width-filled))
 }
 
 func progressRatio(position, duration string) float64 {

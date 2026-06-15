@@ -629,6 +629,10 @@ func TestWideBodyKeepsPaneWidthsAligned(t *testing.T) {
 	if got := lipgloss.Width(model.renderRooms(sidebarWidth)); got != sidebarWidth {
 		t.Fatalf("rooms pane width = %d, want %d", got, sidebarWidth)
 	}
+	rightWidth := 108 - sidebarWidth - paneGapWidth
+	if got := lipgloss.Width(model.renderRightPane(rightWidth)); got != rightWidth {
+		t.Fatalf("right pane width = %d, want %d", got, rightWidth)
+	}
 }
 
 func testConfig() Config {
