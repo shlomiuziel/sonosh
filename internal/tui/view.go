@@ -82,7 +82,7 @@ func (m Model) renderHeaderContent(width int) string {
 	}
 	statusView := statusPill(status)
 	if m.loading {
-		statusView = lipgloss.JoinHorizontal(lipgloss.Center, spinnerStyle.Render(m.spinner()), " ", statusView)
+		statusView = lipgloss.JoinHorizontal(lipgloss.Center, spinnerStyle.Render(m.spinner()), paneSpace(1), statusView)
 	}
 	line := lipgloss.JoinHorizontal(
 		lipgloss.Center,
@@ -92,16 +92,17 @@ func (m Model) renderHeaderContent(width int) string {
 		paneSpace(2),
 		statusView,
 	)
-	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(line)
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Background(colorPanel).Render(line)
 }
 
 func (m Model) renderRooms(width int) string {
 	contentWidth := max(1, width-borderChrome)
+	rowWidth := max(1, contentWidth-sidebarStyle.GetHorizontalPadding())
 	var lines []string
-	lines = append(lines, labelStyle.Render("Rooms"))
+	lines = append(lines, labelStyle.Width(rowWidth).Render("Rooms"))
 	if len(m.rooms) == 0 {
-		lines = append(lines, subtitleStyle.Render("No rooms found"))
-		lines = append(lines, hintStyle.Render("Press r to discover"))
+		lines = append(lines, subtitleStyle.Width(rowWidth).Render("No rooms found"))
+		lines = append(lines, hintStyle.Width(rowWidth).Render("Press r to discover"))
 		return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
 	}
 
@@ -113,10 +114,9 @@ func (m Model) renderRooms(width int) string {
 			members = room.IP
 		}
 		if i == m.roomIndex {
-			lines = append(lines, selectedRoomRow(name, members, max(1, contentWidth-sidebarStyle.GetHorizontalPadding())))
+			lines = append(lines, selectedRoomRow(name, members, rowWidth))
 		} else {
-			row := fmt.Sprintf("%s\n%s", titleStyle.Render(name), subtitleStyle.Render(members))
-			lines = append(lines, lipgloss.NewStyle().Padding(0, 1).Render(row))
+			lines = append(lines, roomRow(name, members, rowWidth))
 		}
 	}
 
@@ -378,15 +378,26 @@ func selectedLine(value string, width int) string {
 	contentWidth := max(1, width-lipgloss.Width("▸"))
 	textWidth := max(1, contentWidth-selectedStyle.GetHorizontalPadding())
 	content := selectedStyle.Width(contentWidth).Render(displayText(value, textWidth))
-	return lipgloss.NewStyle().Width(width).Render(marker + content)
+	return paneBlock(width, 1).Render(marker + content)
+}
+
+func roomRow(name, members string, width int) string {
+	contentWidth := max(1, width-2)
+	nameLine := titleStyle.Width(contentWidth).Render(displayText(name, contentWidth))
+	memberLine := subtitleStyle.Width(contentWidth).Render(displayText(members, contentWidth))
+	return lipgloss.NewStyle().
+		Width(width).
+		Background(colorPanel).
+		Padding(0, 1).
+		Render(nameLine + "\n" + memberLine)
 }
 
 func selectedRoomRow(name, members string, width int) string {
 	contentWidth := max(1, width-lipgloss.Width("▸"))
 	textWidth := max(1, contentWidth-selectedStyle.GetHorizontalPadding())
 	nameLine := accentStyle.Render("▸") + selectedStyle.Width(contentWidth).Render(displayText(name, textWidth))
-	memberLine := paneSpace(1) + subtitleStyle.Foreground(colorSelected).Background(colorPanel).Bold(true).Render(displayText(members, contentWidth))
-	return lipgloss.NewStyle().Width(width).Render(nameLine + "\n" + memberLine)
+	memberLine := paneSpace(1) + subtitleStyle.Foreground(colorSelected).Background(colorPanel).Bold(true).Width(contentWidth).Render(displayText(members, contentWidth))
+	return paneBlock(width, 2).Render(nameLine + "\n" + memberLine)
 }
 
 func (m Model) renderPlaylistPreview(width int) string {
