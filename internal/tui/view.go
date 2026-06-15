@@ -996,7 +996,7 @@ func muteLabel(muted bool) string {
 	if muted {
 		return "muted"
 	}
-	return "live"
+	return "unmuted"
 }
 
 func renderBar(ratio float64, width int, color lipgloss.Color) string {
