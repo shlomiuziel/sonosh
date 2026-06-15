@@ -92,8 +92,32 @@ func TestRenderAlbumArtKitty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render kitty art: %v", err)
 	}
-	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "c=4") || !strings.Contains(view, "r=2") {
+	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "c=4") || !strings.Contains(view, "r=2") || !strings.Contains(view, "z=-1") {
 		t.Fatalf("unexpected kitty sequence:\n%s", view)
+	}
+}
+
+func TestRenderAlbumArtViewsProvidesKittyFallback(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 128, A: 255})
+		}
+	}
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	view, fallback, err := renderAlbumArtViews(buf.Bytes(), true)
+	if err != nil {
+		t.Fatalf("render album art views: %v", err)
+	}
+	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "z=-1") {
+		t.Fatalf("expected kitty image view, got:\n%s", view)
+	}
+	if strings.Contains(fallback, "\x1b_G") || !strings.Contains(fallback, "▀") {
+		t.Fatalf("expected block fallback without kitty graphics, got:\n%s", fallback)
 	}
 }
 

@@ -37,12 +37,14 @@ type Model struct {
 	config  Config
 	helper  *macoshelper.Controller
 
-	rooms     []Room
-	roomIndex int
-	status    Status
-	artURL    string
-	artView   string
-	artViews  map[string]string
+	rooms            []Room
+	roomIndex        int
+	status           Status
+	artURL           string
+	artView          string
+	artFallbackView  string
+	artViews         map[string]string
+	artFallbackViews map[string]string
 
 	mode                    mode
 	loading                 bool
@@ -100,9 +102,10 @@ type statusMsg struct {
 }
 
 type albumArtMsg struct {
-	url  string
-	view string
-	err  error
+	url          string
+	view         string
+	fallbackView string
+	err          error
 }
 
 type actionMsg struct {
@@ -207,7 +210,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		return m, nil
+		return m, tea.ClearScreen
 	case tea.KeyMsg:
 		return m.updateKey(msg)
 	case roomsMsg:
@@ -244,8 +247,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if url != m.artURL {
 					m.artURL = url
 					m.artView = ""
+					m.artFallbackView = ""
 					if view, ok := m.artViews[url]; ok {
 						m.artView = view
+						m.artFallbackView = m.artFallbackViews[url]
 					} else {
 						return m, fetchAlbumArtCmd(url, supportsKittyGraphics())
 					}
@@ -253,6 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.artURL = ""
 				m.artView = ""
+				m.artFallbackView = ""
 			}
 			m.publishNowPlaying()
 		}
@@ -265,10 +271,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.artView = msg.view
+		m.artFallbackView = msg.fallbackView
 		if m.artViews == nil {
 			m.artViews = make(map[string]string)
 		}
+		if m.artFallbackViews == nil {
+			m.artFallbackViews = make(map[string]string)
+		}
 		m.artViews[msg.url] = msg.view
+		m.artFallbackViews[msg.url] = msg.fallbackView
 		return m, nil
 	case actionMsg:
 		m.loading = false
@@ -473,12 +484,12 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.mode = modeSearch
 		m.err = nil
-		return m, nil
+		return m, tea.ClearScreen
 	case "o":
 		m.mode = modePlaybackConfig
 		m.playbackConfigIndex = 0
 		m.err = nil
-		return m, nil
+		return m, tea.ClearScreen
 	case "esc":
 		m.dashboardFocus = focusMain
 		m.mode = modeDashboard

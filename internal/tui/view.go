@@ -38,14 +38,17 @@ func (m Model) renderApp() string {
 	viewModel := m
 	if m.mode == modeSearch || m.mode == modePlaybackConfig {
 		viewModel.mode = modeDashboard
+		if strings.Contains(viewModel.artView, "\x1b_G") && !strings.Contains(viewModel.artView, "z=-") {
+			viewModel.artView = viewModel.artFallbackView
+		}
 	}
 	view := viewModel.renderAppContent(contentWidth)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
-	if supportsKittyGraphics() && m.mode == modeDashboard {
-		return clearKittyGraphics() + rendered
-	}
 	if overlay := m.renderOverlay(height, contentWidth); overlay.content != "" {
-		return overlayFrame(rendered, overlay.x, overlay.y, overlay.content)
+		rendered = overlayFrame(rendered, overlay.x, overlay.y, overlay.content)
+	}
+	if supportsKittyGraphics() {
+		return clearKittyGraphics() + rendered
 	}
 	return rendered
 }
@@ -68,26 +71,31 @@ func (m Model) renderAppContent(width int) string {
 	rightWidth = max(1, rightWidth)
 	right := m.renderRightPane(rightWidth)
 	footer := m.renderFooterPane(rightWidth)
-	spacer := lipgloss.NewStyle().Width(rightWidth).Height(1).Render("")
+	spacer := appSpace(rightWidth, 1)
 	center := lipgloss.JoinVertical(lipgloss.Left, right, spacer, footer)
 
 	if m.showQueuePane(width) {
 		queue := m.renderQueue(queuePaneWidth)
 		separatorHeight := max(lipgloss.Height(left), max(lipgloss.Height(center), lipgloss.Height(queue)))
+		left = padColumn(left, sidebarWidth, separatorHeight)
+		center = padColumn(center, rightWidth, separatorHeight)
+		queue = padColumn(queue, queuePaneWidth, separatorHeight)
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), center, paneGap(separatorHeight), queue)
 	}
 
 	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(center))
+	left = padColumn(left, sidebarWidth, separatorHeight)
+	center = padColumn(center, rightWidth, separatorHeight)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), center)
 }
 
 func (m Model) renderCompactAppContent(width int) string {
 	contentWidth := max(1, min(width, 88))
 	main := m.renderRightPane(contentWidth)
-	spacer := lipgloss.NewStyle().Width(contentWidth).Height(1).Render("")
+	spacer := appSpace(contentWidth, 1)
 	footer := m.renderFooterPane(contentWidth)
 	stack := lipgloss.JoinVertical(lipgloss.Left, main, spacer, footer)
-	return lipgloss.PlaceHorizontal(width, lipgloss.Center, stack)
+	return lipgloss.PlaceHorizontal(width, lipgloss.Center, stack, lipgloss.WithWhitespaceBackground(colorBase))
 }
 
 func (m Model) renderBody(width int) string {
@@ -119,12 +127,17 @@ func (m Model) renderDashboardBody(width int) string {
 		right := m.renderRightPane(rightWidth)
 		queue := m.renderQueue(queuePaneWidth)
 		separatorHeight := max(lipgloss.Height(left), max(lipgloss.Height(right), lipgloss.Height(queue)))
+		left = padColumn(left, sidebarWidth, separatorHeight)
+		right = padColumn(right, rightWidth, separatorHeight)
+		queue = padColumn(queue, queuePaneWidth, separatorHeight)
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), right, paneGap(separatorHeight), queue)
 	}
 
 	rightWidth := width - sidebarWidth - paneGapWidth
 	right := m.renderRightPane(rightWidth)
 	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(right))
+	left = padColumn(left, sidebarWidth, separatorHeight)
+	right = padColumn(right, rightWidth, separatorHeight)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), right)
 }
 
@@ -315,9 +328,7 @@ func (m Model) renderNowPlayingContent(width int) string {
 			coverWidth = min(24, innerWidth)
 		}
 		cover := m.renderCover(coverWidth)
-		if m.compactLayout {
-			cover = lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, cover, lipgloss.WithWhitespaceBackground(colorPanel))
-		}
+		cover = lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, cover, lipgloss.WithWhitespaceBackground(colorPanel))
 		content = lipgloss.JoinVertical(lipgloss.Center, cover, details)
 	} else {
 		cover := m.renderCover(coverWidth)
@@ -413,7 +424,7 @@ func centerLine(width int, value string) string {
 	if lineWidth >= width {
 		return value
 	}
-	return strings.Repeat(" ", (width-lineWidth)/2) + value
+	return paneSpace((width-lineWidth)/2) + value
 }
 
 func (m Model) renderTrackDetails(width int) string {
@@ -461,7 +472,7 @@ func (m Model) renderTransport(width int) string {
 		keycap("/", "Search"),
 	}
 	line := strings.Join(controls, paneSpace(2))
-	return truncate(line, width)
+	return truncatePane(line, width)
 }
 
 func (m Model) renderPlaybackConfigPanel(width int) string {
@@ -921,21 +932,25 @@ func (m Model) renderFooterContent(width int) string {
 	keys = footerKeys(keys, available)
 	segments := []string{status}
 	if keys != "" {
-		segments = append(segments, "    ", footerHintStyle().Render(keys))
+		segments = append(segments, footerSpace(4), footerHintStyle().Render(keys))
 	}
 	if theme != "" && width-lipgloss.Width(status)-lipgloss.Width(keys)-4 > themeWidth {
-		segments = append(segments, "  ", theme, " ", themeHint)
+		segments = append(segments, footerSpace(2), theme, footerSpace(1), themeHint)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, segments...)
 }
 
 func (m Model) renderFooter(width int) string {
-	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(m.renderFooterContent(width))
+	return lipgloss.NewStyle().
+		Width(width).
+		Padding(0, 1).
+		Background(colorBase).
+		Render(m.renderFooterContent(width))
 }
 
 func (m Model) renderFooterPane(width int) string {
 	footer := m.renderFooterContent(width)
-	return lipgloss.PlaceHorizontal(width, lipgloss.Center, footer)
+	return lipgloss.PlaceHorizontal(width, lipgloss.Center, footer, lipgloss.WithWhitespaceBackground(colorBase))
 }
 
 func (m Model) renderFooterRow(width int) string {
@@ -949,6 +964,7 @@ func (m Model) renderFooterRow(width int) string {
 	rightWidth = max(1, rightWidth)
 	gutter := lipgloss.NewStyle().
 		Width(sidebarWidth + paneGapWidth).
+		Background(colorBase).
 		Render("")
 	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, m.renderFooterPane(rightWidth))
 }
@@ -1001,6 +1017,7 @@ func paneGap(height int) string {
 	return lipgloss.NewStyle().
 		Width(paneGapWidth).
 		Height(max(1, height)).
+		Background(colorBase).
 		Render("")
 }
 
@@ -1039,6 +1056,29 @@ func paneSpace(width int) string {
 	return lipgloss.NewStyle().Background(colorPanel).Render(strings.Repeat(" ", width))
 }
 
+func footerSpace(width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().Background(colorBase).Render(strings.Repeat(" ", width))
+}
+
+func appSpace(width, height int) string {
+	return lipgloss.NewStyle().
+		Width(max(1, width)).
+		Height(max(1, height)).
+		Background(colorBase).
+		Render("")
+}
+
+func padColumn(value string, width, height int) string {
+	return lipgloss.NewStyle().
+		Width(max(1, width)).
+		Height(max(1, height)).
+		Background(colorBase).
+		Render(value)
+}
+
 func paneBlock(width, height int) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Width(max(1, width)).
@@ -1054,11 +1094,11 @@ func paneText(value string) string {
 }
 
 func footerHintStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(colorMuted)
+	return lipgloss.NewStyle().Foreground(colorMuted).Background(colorBase)
 }
 
 func footerMessageStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(colorWarn)
+	return lipgloss.NewStyle().Foreground(colorWarn).Background(colorBase)
 }
 
 func themePill(name string) string {
@@ -1141,14 +1181,15 @@ func truncate(value string, width int) string {
 	if width <= 0 || lipgloss.Width(value) <= width {
 		return value
 	}
-	if width <= 1 {
-		return "…"
+	return ansi.Truncate(value, width, "…")
+}
+
+func truncatePane(value string, width int) string {
+	value = strings.TrimSpace(value)
+	if width <= 0 || lipgloss.Width(value) <= width {
+		return value
 	}
-	runes := []rune(value)
-	for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > width {
-		runes = runes[:len(runes)-1]
-	}
-	return string(runes) + "…"
+	return ansi.Truncate(value, width, hintStyle.Render("…"))
 }
 
 func normalizeState(state string) string {

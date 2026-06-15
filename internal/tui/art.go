@@ -40,12 +40,27 @@ func fetchAlbumArtCmd(url string, kitty bool) tea.Cmd {
 		if err != nil {
 			return albumArtMsg{url: url, err: err}
 		}
-		view, err := renderAlbumArtView(raw, kitty)
+		view, fallbackView, err := renderAlbumArtViews(raw, kitty)
 		if err != nil {
 			return albumArtMsg{url: url, err: err}
 		}
-		return albumArtMsg{url: url, view: view}
+		return albumArtMsg{url: url, view: view, fallbackView: fallbackView}
 	}
+}
+
+func renderAlbumArtViews(data []byte, kitty bool) (string, string, error) {
+	view, err := renderAlbumArtView(data, kitty)
+	if err != nil {
+		return "", "", err
+	}
+	if !kitty {
+		return view, view, nil
+	}
+	fallback, err := renderAlbumArtBlocks(data, albumArtColumns, albumArtRows)
+	if err != nil {
+		return view, "", nil
+	}
+	return view, fallback, nil
 }
 
 func renderAlbumArtView(data []byte, kitty bool) (string, error) {
@@ -79,7 +94,7 @@ func renderKittyAlbumArt(data []byte, cols, rows int) (string, error) {
 	}
 
 	payload := base64.StdEncoding.EncodeToString(encoded.Bytes())
-	return fmt.Sprintf("\x1b_Ga=T,C=1,f=100,c=%d,r=%d;%s\x1b\\", cols, rows, payload), nil
+	return fmt.Sprintf("\x1b_Ga=T,C=1,f=100,c=%d,r=%d,z=-1;%s\x1b\\", cols, rows, payload), nil
 }
 
 func renderAlbumArtBlocks(data []byte, cols, rows int) (string, error) {

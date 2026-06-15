@@ -86,6 +86,7 @@ var visualThemes = []visualTheme{
 }
 
 var (
+	colorBase     lipgloss.Color
 	colorInk      lipgloss.Color
 	colorMuted    lipgloss.Color
 	colorSubtle   lipgloss.Color
@@ -130,6 +131,7 @@ func applyTheme(name string) string {
 	activeThemeName = visualThemes[index].Name
 	theme := visualThemes[index]
 
+	colorBase = theme.Panel
 	colorInk = theme.Ink
 	colorMuted = theme.Muted
 	colorSubtle = theme.Subtle
@@ -142,7 +144,8 @@ func applyTheme(name string) string {
 	colorSelected = theme.Selected
 
 	baseStyle = lipgloss.NewStyle().
-		Foreground(colorInk)
+		Foreground(colorInk).
+		Background(colorBase)
 
 	panelStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

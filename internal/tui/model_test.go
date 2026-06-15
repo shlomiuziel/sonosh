@@ -88,6 +88,22 @@ func TestSpinnerAdvancesOnlyWhileLoading(t *testing.T) {
 	}
 }
 
+func TestWindowResizeClearsScreen(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+
+	updated, cmd := model.Update(tea.WindowSizeMsg{Width: 120, Height: 32})
+	model = updated.(Model)
+	if model.width != 120 || model.height != 32 {
+		t.Fatalf("window size = %dx%d, want 120x32", model.width, model.height)
+	}
+	if cmd == nil {
+		t.Fatal("expected clear screen command after resize")
+	}
+	if got := fmt.Sprintf("%T", runCmd(cmd)); got != "tea.clearScreenMsg" {
+		t.Fatalf("resize command = %s, want tea.clearScreenMsg", got)
+	}
+}
+
 func TestDashboardKeysDispatchActions(t *testing.T) {
 	backend := &fakeBackend{
 		rooms:  []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.11"}},
@@ -155,8 +171,11 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 
 	updated, cmd := model.Update(key("o"))
 	model = updated.(Model)
-	if cmd != nil {
-		t.Fatal("did not expect command when opening playback config")
+	if cmd == nil {
+		t.Fatal("expected clear screen command when opening playback config")
+	}
+	if got := fmt.Sprintf("%T", runCmd(cmd)); got != "tea.clearScreenMsg" {
+		t.Fatalf("playback config open command = %s, want tea.clearScreenMsg", got)
 	}
 	if model.mode != modePlaybackConfig {
 		t.Fatalf("mode = %v, want playback config", model.mode)
@@ -727,7 +746,8 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
 	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist", AlbumArt: "http://example.test/art.jpg"}
 	model.artURL = model.status.AlbumArt
-	model.artView = "▀▀▀▀\n▀▀▀▀"
+	model.artView = "\x1b_Ga=T,C=1,f=100,c=16,r=8,z=-1;AAAA\x1b\\"
+	model.artFallbackView = "▀▀▀▀\n▀▀▀▀"
 	model.searchQuery = "mas que nada"
 	model.searchPreviewQuery = "mas que nada"
 	model.searchItems = []SearchResult{
@@ -752,14 +772,39 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	if !strings.Contains(view, "╭") || !strings.Contains(strings.ToUpper(view), "SPOTIFY / TRACKS") {
 		t.Fatalf("search modal missing expected framing or label:\n%s", view)
 	}
-	if strings.Contains(view, clearKittyGraphics()) {
-		t.Fatalf("search surface should not clear terminal graphics:\n%s", view)
+	if !strings.HasPrefix(view, clearKittyGraphics()) {
+		t.Fatalf("search surface should clear terminal graphics before drawing modal:\n%s", view)
+	}
+	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "z=-1") {
+		t.Fatalf("search surface should redraw kitty album art as an underlay behind the modal:\n%s", view)
 	}
 	if strings.Contains(view, "\x1b[s") || strings.Contains(view, "\x1b[u") {
 		t.Fatalf("search surface should not use cursor-position overlays:\n%s", view)
 	}
 	if !strings.Contains(view, "Kitchen") || !strings.Contains(view, "Current Track") {
 		t.Fatalf("search surface should keep the dashboard rendered behind the modal:\n%s", view)
+	}
+}
+
+func TestViewRendersSearchSurfaceFallsBackForTopLayerKittyArt(t *testing.T) {
+	t.Setenv("TERM_PROGRAM", "Ghostty")
+
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 110
+	model.loading = false
+	model.mode = modeSearch
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
+	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist", AlbumArt: "http://example.test/art.jpg"}
+	model.artURL = model.status.AlbumArt
+	model.artView = "\x1b_Ga=T,C=1,f=100,c=16,r=8;AAAA\x1b\\"
+	model.artFallbackView = "▀▀▀▀\n▀▀▀▀"
+
+	view := model.View()
+	if strings.Contains(view, "\x1b_Ga=T") {
+		t.Fatalf("search surface should not redraw top-layer kitty art behind modal:\n%s", view)
+	}
+	if !strings.Contains(view, "▀▀▀▀") {
+		t.Fatalf("search surface should keep fallback album art behind the modal:\n%s", view)
 	}
 }
 
@@ -1003,8 +1048,14 @@ func TestDashboardTabFocusesQueueWhenVisible(t *testing.T) {
 		t.Fatalf("focus = %v, want queue", model.dashboardFocus)
 	}
 
-	updated, _ = model.Update(key("/"))
+	updated, cmd = model.Update(key("/"))
 	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected clear screen command when opening search")
+	}
+	if got := fmt.Sprintf("%T", runCmd(cmd)); got != "tea.clearScreenMsg" {
+		t.Fatalf("search open command = %s, want tea.clearScreenMsg", got)
+	}
 	if model.mode != modeSearch {
 		t.Fatalf("mode = %v, want search", model.mode)
 	}
