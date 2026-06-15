@@ -214,6 +214,9 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	if model.status.RepeatMode != "all" {
 		t.Fatalf("repeat mode = %q, want all", model.status.RepeatMode)
 	}
+	if !model.status.ShuffleEnabled {
+		t.Fatal("shuffle should remain enabled when repeat all is enabled")
+	}
 	if model.message != "repeat all" {
 		t.Fatalf("message = %q, want repeat all", model.message)
 	}

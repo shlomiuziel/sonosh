@@ -243,9 +243,6 @@ func (b *SonosBackend) ToggleShuffle(ctx context.Context, room Room) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	if repeatModeFromPlayMode(mode) == "once" && !sonosShuffleEnabled(mode) {
-		return false, fmt.Errorf("shuffle cannot be combined with repeat once")
-	}
 	nextMode := setShufflePlayMode(mode, !sonosShuffleEnabled(mode))
 	if err := c.SetPlayMode(ctx, nextMode); err != nil {
 		return false, err
@@ -320,7 +317,7 @@ func setShufflePlayMode(mode string, enabled bool) string {
 		case "all":
 			return "SHUFFLE"
 		case "once":
-			return normalized
+			return "SHUFFLE_REPEAT_ONE"
 		default:
 			return "SHUFFLE_NOREPEAT"
 		}
@@ -369,6 +366,9 @@ func setRepeatPlayMode(mode, repeat string) string {
 	shuffle := sonosShuffleEnabled(normalized)
 	switch strings.ToLower(strings.TrimSpace(repeat)) {
 	case "once":
+		if shuffle {
+			return "SHUFFLE_REPEAT_ONE"
+		}
 		return "REPEAT_ONE"
 	case "all":
 		if shuffle {
