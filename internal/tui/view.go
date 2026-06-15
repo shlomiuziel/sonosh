@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -624,33 +625,77 @@ func overlayFrame(base string, x, y int, content string) string {
 		line := baseLines[index]
 		overlayWidth := lipgloss.Width(overlayLine)
 		prefix := ansi.Truncate(line, leftWidth, "")
-		suffix := visibleSuffix(line, leftWidth+overlayWidth)
+		suffix := styledVisibleSuffix(line, leftWidth+overlayWidth)
 		baseLines[index] = prefix + overlayLine + suffix
 	}
 	return strings.Join(baseLines, "\n")
 }
 
-func visibleSuffix(line string, start int) string {
+func styledVisibleSuffix(line string, start int) string {
 	if start <= 0 {
 		return line
 	}
-	plain := ansi.Strip(line)
-	if lipgloss.Width(plain) <= start {
+	var styles strings.Builder
+	var suffix strings.Builder
+	width := 0
+	for i := 0; i < len(line); {
+		if line[i] == '\x1b' {
+			seq, next, sgr := scanANSISequence(line, i)
+			if next <= i {
+				i++
+				continue
+			}
+			if width < start && sgr {
+				styles.WriteString(seq)
+			}
+			if width >= start {
+				suffix.WriteString(seq)
+			}
+			i = next
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(line[i:])
+		if r == utf8.RuneError && size == 0 {
+			break
+		}
+		value := line[i : i+size]
+		nextWidth := width + lipgloss.Width(value)
+		if nextWidth > start {
+			suffix.WriteString(value)
+		}
+		width = nextWidth
+		i += size
+	}
+	if suffix.Len() == 0 {
 		return ""
 	}
-	return dropVisibleCells(plain, start)
+	return styles.String() + suffix.String()
 }
 
-func dropVisibleCells(value string, cells int) string {
-	if cells <= 0 {
-		return value
+func scanANSISequence(value string, start int) (string, int, bool) {
+	if start+1 >= len(value) || value[start] != '\x1b' {
+		return "", start, false
 	}
-	for i := range value {
-		if lipgloss.Width(value[:i]) >= cells {
-			return value[i:]
+	if value[start+1] == '[' {
+		for i := start + 2; i < len(value); i++ {
+			if value[i] >= 0x40 && value[i] <= 0x7e {
+				return value[start : i+1], i + 1, value[i] == 'm'
+			}
 		}
+		return value[start:], len(value), false
 	}
-	return ""
+	if strings.ContainsRune("]_P^", rune(value[start+1])) {
+		for i := start + 2; i < len(value); i++ {
+			if value[i] == '\a' {
+				return value[start : i+1], i + 1, false
+			}
+			if value[i] == '\x1b' && i+1 < len(value) && value[i+1] == '\\' {
+				return value[start : i+2], i + 2, false
+			}
+		}
+		return value[start:], len(value), false
+	}
+	return value[start : start+2], start + 2, false
 }
 
 func (m Model) renderSearchContent(width int) string {
