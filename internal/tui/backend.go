@@ -31,6 +31,10 @@ type Status struct {
 	Muted            bool
 	CrossfadeEnabled bool
 	CrossfadeKnown   bool
+	ShuffleEnabled   bool
+	ShuffleKnown     bool
+	RepeatMode       string
+	RepeatKnown      bool
 	QueuePosition    int
 }
 
@@ -70,6 +74,8 @@ type Backend interface {
 	SetVolume(context.Context, Room, int) error
 	ToggleMute(context.Context, Room) error
 	ToggleCrossfade(context.Context, Room) (bool, error)
+	ToggleShuffle(context.Context, Room) (bool, error)
+	ToggleRepeat(context.Context, Room) (string, error)
 	Queue(context.Context, Room, int, int) (QueuePage, error)
 	PlayQueuePosition(context.Context, Room, int) error
 	RemoveQueuePosition(context.Context, Room, int) error
@@ -154,6 +160,8 @@ func (b *SonosBackend) Status(ctx context.Context, room Room) (Status, error) {
 		return Status{}, err
 	}
 	crossfade, crossfadeErr := transportClient.GetCrossfadeMode(ctx)
+	playMode, playModeErr := transportClient.GetPlayMode(ctx)
+	repeatMode := repeatModeFromPlayMode(playMode)
 	queuePosition := 0
 	if n, err := strconv.Atoi(strings.TrimSpace(position.Track)); err == nil && n > 0 {
 		queuePosition = n
@@ -167,6 +175,10 @@ func (b *SonosBackend) Status(ctx context.Context, room Room) (Status, error) {
 		Muted:            muted,
 		CrossfadeEnabled: crossfade,
 		CrossfadeKnown:   crossfadeErr == nil,
+		ShuffleEnabled:   sonosShuffleEnabled(playMode),
+		ShuffleKnown:     playModeErr == nil,
+		RepeatMode:       repeatMode,
+		RepeatKnown:      playModeErr == nil,
 		QueuePosition:    queuePosition,
 	}
 	if item, ok := sonos.ParseNowPlaying(position.TrackMeta); ok {
@@ -225,6 +237,36 @@ func (b *SonosBackend) ToggleCrossfade(ctx context.Context, room Room) (bool, er
 	return next, nil
 }
 
+func (b *SonosBackend) ToggleShuffle(ctx context.Context, room Room) (bool, error) {
+	c := sonos.NewClient(room.transportIP(), b.Timeout)
+	mode, err := c.GetPlayMode(ctx)
+	if err != nil {
+		return false, err
+	}
+	if repeatModeFromPlayMode(mode) == "once" && !sonosShuffleEnabled(mode) {
+		return false, fmt.Errorf("shuffle cannot be combined with repeat once")
+	}
+	nextMode := setShufflePlayMode(mode, !sonosShuffleEnabled(mode))
+	if err := c.SetPlayMode(ctx, nextMode); err != nil {
+		return false, err
+	}
+	return sonosShuffleEnabled(nextMode), nil
+}
+
+func (b *SonosBackend) ToggleRepeat(ctx context.Context, room Room) (string, error) {
+	c := sonos.NewClient(room.transportIP(), b.Timeout)
+	mode, err := c.GetPlayMode(ctx)
+	if err != nil {
+		return "", err
+	}
+	nextRepeat := nextRepeatMode(repeatModeFromPlayMode(mode))
+	nextMode := setRepeatPlayMode(mode, nextRepeat)
+	if err := c.SetPlayMode(ctx, nextMode); err != nil {
+		return "", err
+	}
+	return nextRepeat, nil
+}
+
 func (b *SonosBackend) Queue(ctx context.Context, room Room, start, count int) (QueuePage, error) {
 	page, err := sonos.NewClient(room.transportIP(), b.Timeout).ListQueue(ctx, start, count)
 	if err != nil {
@@ -262,6 +304,83 @@ func (b *SonosBackend) ClearQueue(ctx context.Context, room Room) error {
 
 func (b *SonosBackend) MoveQueuePosition(ctx context.Context, room Room, fromPosition, toPosition int) error {
 	return sonos.NewClient(room.transportIP(), b.Timeout).MoveQueuePosition(ctx, fromPosition, toPosition)
+}
+
+func sonosShuffleEnabled(mode string) bool {
+	return strings.Contains(strings.ToUpper(strings.TrimSpace(mode)), "SHUFFLE")
+}
+
+func setShufflePlayMode(mode string, enabled bool) string {
+	normalized := strings.ToUpper(strings.TrimSpace(mode))
+	if normalized == "" {
+		normalized = "NORMAL"
+	}
+	if enabled {
+		switch repeatModeFromPlayMode(normalized) {
+		case "all":
+			return "SHUFFLE"
+		case "once":
+			return normalized
+		default:
+			return "SHUFFLE_NOREPEAT"
+		}
+	}
+	if !sonosShuffleEnabled(normalized) {
+		return normalized
+	}
+	switch repeatModeFromPlayMode(normalized) {
+	case "all":
+		return "REPEAT_ALL"
+	case "once":
+		return "REPEAT_ONE"
+	default:
+		return "NORMAL"
+	}
+}
+
+func repeatModeFromPlayMode(mode string) string {
+	normalized := strings.ToUpper(strings.TrimSpace(mode))
+	switch {
+	case strings.Contains(normalized, "REPEAT_ONE"):
+		return "once"
+	case strings.Contains(normalized, "REPEAT_ALL"), normalized == "SHUFFLE":
+		return "all"
+	default:
+		return "off"
+	}
+}
+
+func nextRepeatMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "all":
+		return "once"
+	case "once":
+		return "off"
+	default:
+		return "all"
+	}
+}
+
+func setRepeatPlayMode(mode, repeat string) string {
+	normalized := strings.ToUpper(strings.TrimSpace(mode))
+	if normalized == "" {
+		normalized = "NORMAL"
+	}
+	shuffle := sonosShuffleEnabled(normalized)
+	switch strings.ToLower(strings.TrimSpace(repeat)) {
+	case "once":
+		return "REPEAT_ONE"
+	case "all":
+		if shuffle {
+			return "SHUFFLE"
+		}
+		return "REPEAT_ALL"
+	default:
+		if shuffle {
+			return "SHUFFLE_NOREPEAT"
+		}
+		return "NORMAL"
+	}
 }
 
 func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, category, query string, limit int) ([]SearchResult, error) {

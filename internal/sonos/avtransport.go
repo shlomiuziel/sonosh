@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 )
 
 func (c *Client) Play(ctx context.Context) error {
@@ -125,6 +126,28 @@ func (c *Client) SetCrossfadeMode(ctx context.Context, enabled bool) error {
 	_, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "SetCrossfadeMode", map[string]string{
 		"InstanceID":    "0",
 		"CrossfadeMode": mode,
+	})
+	return err
+}
+
+func (c *Client) GetPlayMode(ctx context.Context) (string, error) {
+	resp, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "GetTransportSettings", map[string]string{
+		"InstanceID": "0",
+	})
+	if err != nil {
+		return "", err
+	}
+	mode := strings.TrimSpace(resp["CurrentPlayMode"])
+	if mode == "" {
+		mode = strings.TrimSpace(resp["PlayMode"])
+	}
+	return strings.ToUpper(mode), nil
+}
+
+func (c *Client) SetPlayMode(ctx context.Context, mode string) error {
+	_, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "SetPlayMode", map[string]string{
+		"InstanceID":  "0",
+		"NewPlayMode": strings.ToUpper(strings.TrimSpace(mode)),
 	})
 	return err
 }

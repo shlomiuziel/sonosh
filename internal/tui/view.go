@@ -496,31 +496,55 @@ func (m Model) renderPlaybackConfigModal(width int) string {
 
 func (m Model) renderPlaybackConfigContent(width int) string {
 	contentWidth := max(1, width-borderChrome)
-	state := "unknown"
+	crossfadeState := "unknown"
 	if m.status.CrossfadeKnown {
-		state = onOff(m.status.CrossfadeEnabled)
+		crossfadeState = onOff(m.status.CrossfadeEnabled)
+	}
+	shuffleState := "unknown"
+	if m.status.ShuffleKnown {
+		shuffleState = onOff(m.status.ShuffleEnabled)
+	}
+	repeatState := "unknown"
+	if m.status.RepeatKnown {
+		repeatState = m.status.RepeatMode
+		if repeatState == "" {
+			repeatState = "off"
+		}
 	}
 	rows := []string{
 		labelStyle.Width(contentWidth).Render("Playback"),
-		playbackSettingRow("Crossfade", state, m.status.CrossfadeKnown, contentWidth),
+		playbackSettingRow("Crossfade", crossfadeState, m.status.CrossfadeKnown, contentWidth, m.playbackConfigIndex == 0),
+		playbackSettingRow("Shuffle", shuffleState, m.status.ShuffleKnown, contentWidth, m.playbackConfigIndex == 1),
+		playbackSettingRow("Repeat", repeatState, m.status.RepeatKnown, contentWidth, m.playbackConfigIndex == 2),
 		"",
-		hintStyle.Width(contentWidth).Render("space toggle  esc close"),
+		hintStyle.Width(contentWidth).Render("up/down move  space toggle  esc close"),
 	}
 	return paneBlock(width, lipgloss.Height(strings.Join(rows, "\n"))).Render(strings.Join(rows, "\n"))
 }
 
-func playbackSettingRow(label, state string, known bool, width int) string {
-	pill := togglePill(state, known)
-	labelWidth := max(1, width-lipgloss.Width(pill)-2)
-	return lipgloss.JoinHorizontal(
+func playbackSettingRow(label, state string, known bool, width int, selected bool) string {
+	pill := settingPill(state, known)
+	contentWidth := max(1, width-lipgloss.Width(pill)-2)
+	marker := paneSpace(2)
+	labelWidth := contentWidth
+	if selected {
+		marker = accentStyle.Render("▸") + paneSpace(1)
+		labelWidth = max(1, width-lipgloss.Width(pill)-lipgloss.Width(marker)-2)
+	}
+	row := lipgloss.JoinHorizontal(
 		lipgloss.Center,
+		marker,
 		titleStyle.Width(labelWidth).Render(displayText(label, labelWidth)),
 		paneSpace(2),
 		pill,
 	)
+	if selected {
+		return selectedStyle.Width(width).Render(row)
+	}
+	return row
 }
 
-func togglePill(value string, known bool) string {
+func settingPill(value string, known bool) string {
 	style := lipgloss.NewStyle().
 		Padding(0, 1).
 		Bold(true).
@@ -528,10 +552,13 @@ func togglePill(value string, known bool) string {
 	if !known {
 		return style.Foreground(colorMuted).Background(colorPanelHi).Render("unknown")
 	}
-	if value == "on" {
-		return style.Background(colorAccent).Render("on")
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "on", "all", "once":
+		return style.Background(colorAccent).Render(strings.ToLower(strings.TrimSpace(value)))
+	case "off":
+		return style.Background(colorSubtle).Foreground(colorInk).Render("off")
 	}
-	return style.Background(colorSubtle).Foreground(colorInk).Render("off")
+	return style.Background(colorSubtle).Foreground(colorInk).Render(displayText(value, 4))
 }
 
 func (m Model) renderSearchPanel(width int) string {

@@ -57,3 +57,52 @@ func TestCrossfadeModeCalls(t *testing.T) {
 		t.Fatalf("expected get/set calls, get=%v setOn=%v setOff=%v", sawGet, sawSetOn, sawSetOff)
 	}
 }
+
+func TestPlayModeCalls(t *testing.T) {
+	t.Parallel()
+
+	var sawGet, sawSetOn, sawSetOff bool
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		action := r.Header.Get("SOAPACTION")
+		body, _ := io.ReadAll(r.Body)
+		switch {
+		case strings.Contains(action, "#GetTransportSettings"):
+			sawGet = true
+			return httpResponse(200, `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:GetTransportSettingsResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><CurrentPlayMode>NORMAL</CurrentPlayMode></u:GetTransportSettingsResponse></s:Body></s:Envelope>`), nil
+		case strings.Contains(action, "#SetPlayMode") && strings.Contains(string(body), "<NewPlayMode>SHUFFLE</NewPlayMode>"):
+			sawSetOn = true
+			return httpResponse(200, `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:SetPlayModeResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"></u:SetPlayModeResponse></s:Body></s:Envelope>`), nil
+		case strings.Contains(action, "#SetPlayMode") && strings.Contains(string(body), "<NewPlayMode>NORMAL</NewPlayMode>"):
+			sawSetOff = true
+			return httpResponse(200, `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:SetPlayModeResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"></u:SetPlayModeResponse></s:Body></s:Envelope>`), nil
+		default:
+			t.Fatalf("unexpected SOAP request action=%q body=%s", action, string(body))
+			return nil, nil
+		}
+	})
+
+	c := &Client{
+		IP: "192.0.2.1",
+		HTTP: &http.Client{
+			Timeout:   time.Second,
+			Transport: rt,
+		},
+	}
+
+	mode, err := c.GetPlayMode(context.Background())
+	if err != nil {
+		t.Fatalf("GetPlayMode: %v", err)
+	}
+	if mode != "NORMAL" {
+		t.Fatalf("GetPlayMode = %q, want NORMAL", mode)
+	}
+	if err := c.SetPlayMode(context.Background(), "shuffle"); err != nil {
+		t.Fatalf("SetPlayMode(shuffle): %v", err)
+	}
+	if err := c.SetPlayMode(context.Background(), "normal"); err != nil {
+		t.Fatalf("SetPlayMode(normal): %v", err)
+	}
+	if !sawGet || !sawSetOn || !sawSetOff {
+		t.Fatalf("expected get/set calls, get=%v setOn=%v setOff=%v", sawGet, sawSetOn, sawSetOff)
+	}
+}

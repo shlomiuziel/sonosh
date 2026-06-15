@@ -118,11 +118,13 @@ func TestDashboardKeysDispatchActions(t *testing.T) {
 	}
 }
 
-func TestPlaybackConfigModalTogglesCrossfade(t *testing.T) {
+func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	backend := &fakeBackend{
 		rooms:     []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
-		status:    Status{State: "PLAYING", CrossfadeKnown: true, CrossfadeEnabled: false},
+		status:    Status{State: "PLAYING", CrossfadeKnown: true, CrossfadeEnabled: false, ShuffleKnown: true, ShuffleEnabled: false, RepeatKnown: true, RepeatMode: "off"},
 		crossfade: false,
+		shuffle:   false,
+		repeat:    "off",
 	}
 	model := NewModel(backend, testConfig())
 	model.rooms = backend.rooms
@@ -138,7 +140,7 @@ func TestPlaybackConfigModalTogglesCrossfade(t *testing.T) {
 	}
 
 	view := model.View()
-	for _, want := range []string{"PLAYBACK", "Crossfade", "off", "SPACE TOGGLE"} {
+	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "off", "UP/DOWN MOVE"} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("playback config view missing %q:\n%s", want, view)
 		}
@@ -162,6 +164,78 @@ func TestPlaybackConfigModalTogglesCrossfade(t *testing.T) {
 	}
 	if refreshCmd == nil {
 		t.Fatal("expected status refresh after crossfade toggle")
+	}
+
+	updated, cmd = model.Update(key("down"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command on playback config move")
+	}
+	if model.playbackConfigIndex != 1 {
+		t.Fatalf("playbackConfigIndex = %d, want 1", model.playbackConfigIndex)
+	}
+
+	updated, cmd = model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected shuffle toggle command")
+	}
+	updated, refreshCmd = model.Update(runCmd(cmd))
+	model = updated.(Model)
+	if !backend.shuffle {
+		t.Fatal("backend shuffle was not toggled")
+	}
+	if !model.status.ShuffleKnown || !model.status.ShuffleEnabled {
+		t.Fatalf("model shuffle = known %v enabled %v, want on", model.status.ShuffleKnown, model.status.ShuffleEnabled)
+	}
+	if model.message != "shuffle on" {
+		t.Fatalf("message = %q, want shuffle on", model.message)
+	}
+	if refreshCmd == nil {
+		t.Fatal("expected status refresh after shuffle toggle")
+	}
+
+	updated, cmd = model.Update(key("down"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command on playback config move")
+	}
+	if model.playbackConfigIndex != 2 {
+		t.Fatalf("playbackConfigIndex = %d, want 2", model.playbackConfigIndex)
+	}
+
+	updated, cmd = model.Update(key(" "))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected repeat toggle command")
+	}
+	updated, refreshCmd = model.Update(runCmd(cmd))
+	model = updated.(Model)
+	if model.status.RepeatMode != "all" {
+		t.Fatalf("repeat mode = %q, want all", model.status.RepeatMode)
+	}
+	if model.message != "repeat all" {
+		t.Fatalf("message = %q, want repeat all", model.message)
+	}
+	if refreshCmd == nil {
+		t.Fatal("expected status refresh after repeat toggle")
+	}
+
+	updated, cmd = model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected repeat toggle command")
+	}
+	updated, refreshCmd = model.Update(runCmd(cmd))
+	model = updated.(Model)
+	if model.status.RepeatMode != "once" {
+		t.Fatalf("repeat mode = %q, want once", model.status.RepeatMode)
+	}
+	if model.message != "repeat once" {
+		t.Fatalf("message = %q, want repeat once", model.message)
+	}
+	if refreshCmd == nil {
+		t.Fatal("expected status refresh after repeat toggle")
 	}
 }
 
@@ -187,7 +261,7 @@ func TestPlaybackConfigRendersUnknownCrossfade(t *testing.T) {
 	model.status = Status{State: "PLAYING"}
 
 	view := model.View()
-	for _, want := range []string{"PLAYBACK", "Crossfade", "unknown"} {
+	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "unknown"} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("playback config view missing %q:\n%s", want, view)
 		}
@@ -1027,6 +1101,8 @@ type fakeBackend struct {
 	volume              int
 	muted               bool
 	crossfade           bool
+	shuffle             bool
+	repeat              string
 	queuePage           QueuePage
 	playQueuePosition   int
 	removeQueuePosition int
@@ -1064,6 +1140,23 @@ func (f *fakeBackend) ToggleMute(context.Context, Room) error {
 func (f *fakeBackend) ToggleCrossfade(context.Context, Room) (bool, error) {
 	f.crossfade = !f.crossfade
 	return f.crossfade, nil
+}
+
+func (f *fakeBackend) ToggleShuffle(context.Context, Room) (bool, error) {
+	f.shuffle = !f.shuffle
+	return f.shuffle, nil
+}
+
+func (f *fakeBackend) ToggleRepeat(context.Context, Room) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(f.repeat)) {
+	case "all":
+		f.repeat = "once"
+	case "once":
+		f.repeat = "off"
+	default:
+		f.repeat = "all"
+	}
+	return f.repeat, nil
 }
 
 func (f *fakeBackend) Queue(context.Context, Room, int, int) (QueuePage, error) {

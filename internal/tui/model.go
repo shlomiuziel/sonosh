@@ -67,6 +67,7 @@ type Model struct {
 	queueLoading            bool
 	queueErr                error
 	queueRefreshAt          time.Time
+	playbackConfigIndex     int
 	dashboardFocus          dashboardFocus
 	compactLayout           bool
 
@@ -112,6 +113,16 @@ type actionMsg struct {
 type crossfadeMsg struct {
 	enabled bool
 	err     error
+}
+
+type shuffleMsg struct {
+	enabled bool
+	err     error
+}
+
+type repeatMsg struct {
+	mode string
+	err  error
 }
 
 type queueMsg struct {
@@ -278,6 +289,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case shuffleMsg:
+		m.loading = false
+		m.err = msg.err
+		if msg.err == nil {
+			m.status.ShuffleEnabled = msg.enabled
+			m.status.ShuffleKnown = true
+			m.message = "shuffle " + onOff(msg.enabled)
+			if len(m.rooms) > 0 {
+				m.loading = true
+				return m, statusCmd(m.backend, m.config.Timeout, m.selectedRoom())
+			}
+		}
+		return m, nil
+	case repeatMsg:
+		m.loading = false
+		m.err = msg.err
+		if msg.err == nil {
+			m.status.RepeatMode = msg.mode
+			m.status.RepeatKnown = true
+			m.message = "repeat " + msg.mode
+			if len(m.rooms) > 0 {
+				m.loading = true
+				return m, statusCmd(m.backend, m.config.Timeout, m.selectedRoom())
+			}
+		}
+		return m, nil
 	case queueMsg:
 		m.queueLoading = false
 		m.queueErr = msg.err
@@ -423,6 +460,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "o":
 		m.mode = modePlaybackConfig
+		m.playbackConfigIndex = 0
 		m.err = nil
 		return m, nil
 	case "esc":
@@ -571,6 +609,17 @@ func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab", "esc", "q":
 		m.mode = modeDashboard
 		m.err = nil
+		m.playbackConfigIndex = 0
+		return m, nil
+	case "up", "k":
+		if m.playbackConfigIndex > 0 {
+			m.playbackConfigIndex--
+		}
+		return m, nil
+	case "down", "j":
+		if m.playbackConfigIndex < 2 {
+			m.playbackConfigIndex++
+		}
 		return m, nil
 	case " ", "enter":
 		if len(m.rooms) == 0 {
@@ -578,6 +627,12 @@ func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = true
 		m.err = nil
+		if m.playbackConfigIndex == 1 {
+			return m, tea.Batch(shuffleCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+		}
+		if m.playbackConfigIndex == 2 {
+			return m, tea.Batch(repeatCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+		}
 		return m, tea.Batch(crossfadeCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
 	default:
 		return m, nil
@@ -923,6 +978,24 @@ func crossfadeCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
 		defer cancel()
 		enabled, err := backend.ToggleCrossfade(ctx, room)
 		return crossfadeMsg{enabled: enabled, err: err}
+	}
+}
+
+func shuffleCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		enabled, err := backend.ToggleShuffle(ctx, room)
+		return shuffleMsg{enabled: enabled, err: err}
+	}
+}
+
+func repeatCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		mode, err := backend.ToggleRepeat(ctx, room)
+		return repeatMsg{mode: mode, err: err}
 	}
 }
 
