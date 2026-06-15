@@ -744,6 +744,25 @@ func TestCompactBodyHidesQueuePane(t *testing.T) {
 	}
 }
 
+func TestCompactRoomsUseSingleLineRows(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.rooms = []Room{
+		{Name: "Living Room", IP: "192.0.2.10", GroupMembers: []string{"Living Room"}},
+		{Name: "Office", IP: "192.0.2.11", GroupMembers: []string{"Office"}},
+	}
+
+	compact := model.renderCompactRooms(70)
+	if count := strings.Count(compact, "Living Room"); count != 1 {
+		t.Fatalf("compact room should render once, got %d:\n%s", count, compact)
+	}
+	if strings.Contains(compact, "192.0.2.10") {
+		t.Fatalf("compact room unexpectedly rendered secondary IP line:\n%s", compact)
+	}
+	if strings.Contains(compact, "\nLiving Room") {
+		t.Fatalf("compact room should keep selection marker on the room row:\n%s", compact)
+	}
+}
+
 func TestDashboardTabFocusesQueueWhenVisible(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 	model.width = 132

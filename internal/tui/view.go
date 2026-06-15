@@ -38,7 +38,7 @@ func (m Model) renderApp() string {
 
 	view := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
-	if (m.mode == modeSearch || m.mode == modePlaybackConfig) && supportsKittyGraphics() {
+	if supportsKittyGraphics() {
 		return clearKittyGraphics() + rendered
 	}
 	return rendered
@@ -56,7 +56,7 @@ func (m Model) renderBody(width int) string {
 		case modePlaybackConfig:
 			sections = append(sections, m.renderPlaybackConfigPanel(width))
 		default:
-			sections = append(sections, m.renderRooms(width))
+			sections = append(sections, m.renderCompactRooms(width))
 		}
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
@@ -139,6 +139,24 @@ func (m Model) renderRooms(width int) string {
 	}
 
 	return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderCompactRooms(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	rowWidth := max(1, contentWidth-2)
+	var lines []string
+	lines = append(lines, labelStyle.Width(rowWidth).Render("Rooms"))
+	if len(m.rooms) == 0 {
+		lines = append(lines, subtitleStyle.Width(rowWidth).Render("No rooms found"))
+		lines = append(lines, hintStyle.Width(rowWidth).Render("Press r to discover"))
+		return compactSidebarStyle().Width(contentWidth).Render(strings.Join(lines, "\n"))
+	}
+
+	for i, room := range m.rooms {
+		lines = append(lines, compactRoomRow(displayText(room.Name, max(8, rowWidth-2)), rowWidth, i == m.roomIndex))
+	}
+
+	return compactSidebarStyle().Width(contentWidth).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderQueue(width int) string {
@@ -573,6 +591,29 @@ func selectedRoomRow(name, members string, width int) string {
 	nameLine := accentStyle.Render("▸") + selectedStyle.Width(contentWidth).Render(displayText(name, textWidth))
 	memberLine := paneSpace(1) + subtitleStyle.Foreground(colorSelected).Background(colorPanel).Bold(true).Width(contentWidth).Render(displayText(members, contentWidth))
 	return paneBlock(width, 2).Render(nameLine + "\n" + memberLine)
+}
+
+func compactRoomRow(name string, width int, selected bool) string {
+	marker := " "
+	if selected {
+		marker = "▸"
+	}
+	contentWidth := max(1, width-lipgloss.Width(marker))
+	textWidth := contentWidth
+	markerView := paneText(marker)
+	content := titleStyle.Width(contentWidth).Render(displayText(name, textWidth))
+	if selected {
+		markerView = accentStyle.Render(marker)
+		textWidth = max(1, contentWidth-selectedStyle.GetHorizontalPadding())
+		content = selectedStyle.Width(contentWidth).Render(displayText(name, textWidth))
+	}
+	return paneBlock(width, 1).Render(markerView + content)
+}
+
+func compactSidebarStyle() lipgloss.Style {
+	return panelStyle.Copy().
+		BorderForeground(colorPanelHi).
+		Padding(0, 1)
 }
 
 func (m Model) renderPlaylistPreview(width int) string {

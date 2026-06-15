@@ -107,6 +107,23 @@ func TestClearKittyGraphicsSequence(t *testing.T) {
 	}
 }
 
+func TestGhosttyDashboardClearsTerminalGraphics(t *testing.T) {
+	t.Setenv("TERM_PROGRAM", "Ghostty")
+
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 110
+	model.loading = false
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.status = Status{Title: "Track", Artist: "Artist"}
+	model.artURL = "http://example.test/art.jpg"
+	model.artView = "\x1b_Ga=T,C=1,f=100,c=16,r=8;AAAA\x1b\\"
+
+	view := model.View()
+	if !strings.HasPrefix(view, clearKittyGraphics()) {
+		t.Fatalf("dashboard should clear terminal graphics before rendering album art:\n%s", view)
+	}
+}
+
 func TestRenderCoverArtUsesProvidedInnerWidth(t *testing.T) {
 	art := strings.Repeat("x", albumArtColumns)
 	got := renderCoverArt(albumArtColumns, art)
