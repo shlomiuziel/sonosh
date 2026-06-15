@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -695,6 +696,27 @@ func TestWideFooterCentersInRightPane(t *testing.T) {
 	t.Fatalf("footer was not centered in right pane:\n%q", right)
 }
 
+func TestWideFooterCentersInMainPaneWithQueuePane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.queueItems = []QueueItem{{Position: 1, Title: "Track One"}}
+
+	footer := model.renderFooterRow(130)
+	gutter := strings.Repeat(" ", sidebarWidth+paneGapWidth)
+	if !strings.HasPrefix(footer, gutter) {
+		t.Fatalf("footer did not start after sidebar gutter:\n%q", footer)
+	}
+
+	rightWidth := 130 - sidebarWidth - queuePaneWidth - 2*paneGapWidth
+	right := strings.TrimPrefix(footer, gutter)
+	if got := lipgloss.Width(right); got != rightWidth {
+		t.Fatalf("footer width in main pane = %d, want %d:\n%s", got, rightWidth, footer)
+	}
+	if strings.HasPrefix(right, " ") {
+		return
+	}
+	t.Fatalf("footer was not centered in main pane:\n%q", right)
+}
+
 func TestWideBodyKeepsPaneWidthsAligned(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
@@ -730,6 +752,26 @@ func TestWideBodyRendersQueuePane(t *testing.T) {
 		if !strings.Contains(strings.ToUpper(body), strings.ToUpper(want)) {
 			t.Fatalf("queue body missing %q:\n%s", want, body)
 		}
+	}
+}
+
+func TestQueueFooterSticksToCenterPane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 132
+	model.loading = false
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+	model.message = "footer"
+	for i := 1; i <= 24; i++ {
+		model.queueItems = append(model.queueItems, QueueItem{Position: i, Title: fmt.Sprintf("Track %02d", i)})
+	}
+	model.queueTotal = len(model.queueItems)
+
+	body := model.renderAppContent(130)
+	if !strings.Contains(body, "footer") {
+		t.Fatalf("footer message missing from body:\n%s", body)
+	}
+	if !strings.Contains(body, "Track 01") {
+		t.Fatalf("queue content missing from body:\n%s", body)
 	}
 }
 

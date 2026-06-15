@@ -33,15 +33,40 @@ func (m Model) renderApp() string {
 	}
 
 	contentWidth := width - 2
-	body := m.renderBody(contentWidth)
-	footer := m.renderFooterRow(contentWidth)
-
-	view := lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	view := m.renderAppContent(contentWidth)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
 	if supportsKittyGraphics() {
 		return clearKittyGraphics() + rendered
 	}
 	return rendered
+}
+
+func (m Model) renderAppContent(width int) string {
+	if width < compactAtWidth {
+		body := m.renderBody(width)
+		footer := m.renderFooterRow(width)
+		return lipgloss.JoinVertical(lipgloss.Left, body, footer)
+	}
+
+	left := m.renderRooms(sidebarWidth)
+	rightWidth := width - sidebarWidth - paneGapWidth
+	if m.showQueuePane(width) {
+		rightWidth -= queuePaneWidth + paneGapWidth
+	}
+	rightWidth = max(1, rightWidth)
+	right := m.renderRightPane(rightWidth)
+	footer := m.renderFooterPane(rightWidth)
+	spacer := lipgloss.NewStyle().Width(rightWidth).Height(1).Render("")
+	center := lipgloss.JoinVertical(lipgloss.Left, right, spacer, footer)
+
+	if m.showQueuePane(width) {
+		queue := m.renderQueue(queuePaneWidth)
+		separatorHeight := max(lipgloss.Height(left), max(lipgloss.Height(center), lipgloss.Height(queue)))
+		return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), center, paneGap(separatorHeight), queue)
+	}
+
+	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(center))
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), center)
 }
 
 func (m Model) renderBody(width int) string {
@@ -63,7 +88,10 @@ func (m Model) renderBody(width int) string {
 			sections...,
 		)
 	}
+	return m.renderDashboardBody(width)
+}
 
+func (m Model) renderDashboardBody(width int) string {
 	left := m.renderRooms(sidebarWidth)
 	if m.showQueuePane(width) {
 		rightWidth := width - sidebarWidth - queuePaneWidth - 2*paneGapWidth
@@ -687,16 +715,24 @@ func (m Model) renderFooter(width int) string {
 	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(m.renderFooterContent(width))
 }
 
+func (m Model) renderFooterPane(width int) string {
+	footer := m.renderFooterContent(width)
+	return lipgloss.PlaceHorizontal(width, lipgloss.Center, footer)
+}
+
 func (m Model) renderFooterRow(width int) string {
 	if width < compactAtWidth {
 		return m.renderFooter(width)
 	}
-	rightWidth := max(1, width-sidebarWidth-paneGapWidth)
+	rightWidth := width - sidebarWidth - paneGapWidth
+	if m.showQueuePane(width) {
+		rightWidth -= queuePaneWidth + paneGapWidth
+	}
+	rightWidth = max(1, rightWidth)
 	gutter := lipgloss.NewStyle().
 		Width(sidebarWidth + paneGapWidth).
 		Render("")
-	footer := m.renderFooterContent(rightWidth)
-	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, lipgloss.PlaceHorizontal(rightWidth, lipgloss.Center, footer))
+	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, m.renderFooterPane(rightWidth))
 }
 
 func footerKeys(value string, width int) string {
