@@ -625,8 +625,8 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	model.loading = false
 	model.mode = modeSearch
 	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
-	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist"}
-	model.artURL = "http://example.test/art.jpg"
+	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist", AlbumArt: "http://example.test/art.jpg"}
+	model.artURL = model.status.AlbumArt
 	model.artView = "▀▀▀▀\n▀▀▀▀"
 	model.searchQuery = "mas que nada"
 	model.searchPreviewQuery = "mas que nada"
@@ -643,6 +643,7 @@ func TestViewRendersSearchSurface(t *testing.T) {
 		"Mas Que Nada",
 		"ENTER PLAY  CTRL+T TRACKS  CTRL+P PLAYLISTS  ESC CLOSE",
 		"▸",
+		"█",
 	} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("search view missing %q:\n%s", want, view)
@@ -651,11 +652,14 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	if !strings.Contains(view, "╭") || !strings.Contains(strings.ToUpper(view), "SPOTIFY / TRACKS") {
 		t.Fatalf("search modal missing expected framing or label:\n%s", view)
 	}
-	if strings.Contains(view, "▀▀▀▀") {
-		t.Fatalf("search surface unexpectedly rendered album art:\n%s", view)
+	if strings.Contains(view, clearKittyGraphics()) {
+		t.Fatalf("search surface should not clear terminal graphics:\n%s", view)
 	}
-	if !strings.Contains(view, clearKittyGraphics()) {
-		t.Fatalf("search surface should clear terminal graphics:\n%s", view)
+	if strings.Contains(view, "\x1b[s") || strings.Contains(view, "\x1b[u") {
+		t.Fatalf("search surface should not use cursor-position overlays:\n%s", view)
+	}
+	if !strings.Contains(view, "Kitchen") || !strings.Contains(view, "Current Track") {
+		t.Fatalf("search surface should keep the dashboard rendered behind the modal:\n%s", view)
 	}
 }
 

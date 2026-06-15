@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -33,10 +34,17 @@ func (m Model) renderApp() string {
 	}
 
 	contentWidth := width - 2
-	view := m.renderAppContent(contentWidth)
+	viewModel := m
+	if m.mode == modeSearch || m.mode == modePlaybackConfig {
+		viewModel.mode = modeDashboard
+	}
+	view := viewModel.renderAppContent(contentWidth)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
-	if supportsKittyGraphics() {
+	if supportsKittyGraphics() && m.mode == modeDashboard {
 		return clearKittyGraphics() + rendered
+	}
+	if overlay := m.renderOverlay(height, contentWidth); overlay.content != "" {
+		return overlayFrame(rendered, overlay.x, overlay.y, overlay.content)
 	}
 	return rendered
 }
@@ -460,18 +468,7 @@ func (m Model) renderPlaybackConfigPanel(width int) string {
 }
 
 func (m Model) renderPlaybackConfigSpotlight(width int) string {
-	modalWidth := min(width-6, 58)
-	if modalWidth < 36 {
-		modalWidth = max(1, width-2)
-	}
-	content := m.renderPlaybackConfigContent(modalWidth)
-	modal := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorSelected).
-		Padding(1, 2).
-		Width(modalWidth).
-		Background(colorPanel).
-		Render(content)
+	modal := m.renderPlaybackConfigModal(width)
 	modalHeight := lipgloss.Height(modal)
 	height := m.height
 	if height <= 0 {
@@ -479,6 +476,21 @@ func (m Model) renderPlaybackConfigSpotlight(width int) string {
 	}
 	targetHeight := max(modalHeight, height-6)
 	return lipgloss.Place(width, targetHeight, lipgloss.Center, lipgloss.Center, modal)
+}
+
+func (m Model) renderPlaybackConfigModal(width int) string {
+	modalWidth := min(width-6, 58)
+	if modalWidth < 36 {
+		modalWidth = max(1, width-2)
+	}
+	content := m.renderPlaybackConfigContent(modalWidth)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSelected).
+		Padding(1, 2).
+		Width(modalWidth).
+		Background(colorPanel).
+		Render(content)
 }
 
 func (m Model) renderPlaybackConfigContent(width int) string {
@@ -527,17 +539,7 @@ func (m Model) renderSearchPanel(width int) string {
 }
 
 func (m Model) renderSearchSpotlight(width int) string {
-	modalWidth := min(width-6, 78)
-	if modalWidth < 44 {
-		modalWidth = max(1, width-2)
-	}
-	content := m.renderSearchContent(modalWidth)
-	modal := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorSelected).
-		Padding(1, 2).
-		Width(modalWidth).
-		Render(content)
+	modal := m.renderSearchModal(width)
 	modalHeight := lipgloss.Height(modal)
 	height := m.height
 	if height <= 0 {
@@ -547,15 +549,120 @@ func (m Model) renderSearchSpotlight(width int) string {
 	return lipgloss.Place(width, targetHeight, lipgloss.Center, lipgloss.Center, modal)
 }
 
+func (m Model) renderSearchModal(width int) string {
+	modalWidth := min(width-6, 78)
+	if modalWidth < 44 {
+		modalWidth = max(1, width-2)
+	}
+	content := m.renderSearchContent(modalWidth)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSelected).
+		Padding(1, 2).
+		Width(modalWidth).
+		Background(colorPanel).
+		Render(content)
+}
+
+type overlayContent struct {
+	x       int
+	y       int
+	content string
+}
+
+func (m Model) renderOverlay(height, contentWidth int) overlayContent {
+	paneX, paneWidth := m.overlayPaneBounds(contentWidth)
+	switch m.mode {
+	case modeSearch:
+		return m.renderModalOverlay(paneX, paneWidth, height, m.renderSearchModal(paneWidth))
+	case modePlaybackConfig:
+		return m.renderModalOverlay(paneX, paneWidth, height, m.renderPlaybackConfigModal(paneWidth))
+	default:
+		return overlayContent{}
+	}
+}
+
+func (m Model) overlayPaneBounds(contentWidth int) (int, int) {
+	if m.compactLayout {
+		paneWidth := max(1, min(contentWidth, 88))
+		return max(1, (contentWidth-paneWidth)/2+1), paneWidth
+	}
+	if contentWidth < compactAtWidth {
+		return 1, max(1, contentWidth)
+	}
+	paneWidth := contentWidth - sidebarWidth - paneGapWidth
+	if m.showQueuePane(contentWidth) {
+		paneWidth -= queuePaneWidth + paneGapWidth
+	}
+	return sidebarWidth + paneGapWidth + 1, max(1, paneWidth)
+}
+
+func (m Model) renderModalOverlay(paneX, paneWidth, height int, modal string) overlayContent {
+	modalWidth := lipgloss.Width(modal)
+	modalHeight := lipgloss.Height(modal)
+	if modalWidth <= 0 || modalHeight <= 0 {
+		return overlayContent{}
+	}
+	x := paneX + max(0, (paneWidth-modalWidth)/2)
+	y := max(1, (height-modalHeight)/2+1)
+	return overlayContent{x: x, y: y, content: modal}
+}
+
+func overlayFrame(base string, x, y int, content string) string {
+	if x <= 0 || y <= 0 || content == "" {
+		return base
+	}
+	baseLines := strings.Split(base, "\n")
+	overlayLines := strings.Split(content, "\n")
+	start := y - 1
+	leftWidth := x - 1
+	for i, overlayLine := range overlayLines {
+		index := start + i
+		if index < 0 || index >= len(baseLines) {
+			continue
+		}
+		line := baseLines[index]
+		overlayWidth := lipgloss.Width(overlayLine)
+		prefix := ansi.Truncate(line, leftWidth, "")
+		suffix := visibleSuffix(line, leftWidth+overlayWidth)
+		baseLines[index] = prefix + overlayLine + suffix
+	}
+	return strings.Join(baseLines, "\n")
+}
+
+func visibleSuffix(line string, start int) string {
+	if start <= 0 {
+		return line
+	}
+	plain := ansi.Strip(line)
+	if lipgloss.Width(plain) <= start {
+		return ""
+	}
+	return dropVisibleCells(plain, start)
+}
+
+func dropVisibleCells(value string, cells int) string {
+	if cells <= 0 {
+		return value
+	}
+	for i := range value {
+		if lipgloss.Width(value[:i]) >= cells {
+			return value[i:]
+		}
+	}
+	return ""
+}
+
 func (m Model) renderSearchContent(width int) string {
 	contentWidth := max(1, width-borderChrome)
 	var lines []string
 	query := m.searchQuery
+	placeholder := query == ""
 	if query == "" {
 		query = "type to search..."
 	}
 	lines = append(lines, labelStyle.Render(m.config.SearchService+" / "+m.searchCategory))
-	lines = append(lines, renderSearchField(query, contentWidth))
+	lines = append(lines, renderSearchField(query, contentWidth, placeholder, m.mode == modeSearch))
 
 	if m.searchPreviewQuery != "" && m.searchPreviewQuery != m.searchQuery {
 		lines = append(lines, subtitleStyle.Render("updating results for "+displayText(m.searchQuery, max(10, contentWidth-22))))
@@ -594,18 +701,27 @@ func (m Model) renderSearchContent(width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func renderSearchField(query string, width int) string {
+func renderSearchField(query string, width int, placeholder bool, cursorVisible bool) string {
 	innerWidth := max(8, width-8)
 	display := displayText(query, innerWidth)
-	if strings.TrimSpace(query) == "" {
-		display = hintStyle.Render(display)
+	if placeholder {
+		display = lipgloss.NewStyle().Foreground(colorMuted).Render(display)
 	} else {
-		display = titleStyle.Foreground(colorInk).Render(display)
+		display = lipgloss.NewStyle().Foreground(colorInk).Bold(true).Render(display)
+	}
+	if cursorVisible {
+		cursor := lipgloss.NewStyle().
+			Foreground(colorSelected).
+			Background(colorPanel).
+			Bold(true).
+			Render("█")
+		display += cursor
 	}
 	field := lipgloss.NewStyle().
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorSelected).
+		Background(colorPanel).
 		Foreground(colorInk).
 		Width(max(16, width-4)).
 		Render("> " + display)
