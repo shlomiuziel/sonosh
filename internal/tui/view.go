@@ -9,11 +9,14 @@ import (
 )
 
 const (
-	minWidth       = 72
-	sidebarWidth   = 28
-	paneGapWidth   = 1
-	compactAtWidth = 92
-	borderChrome   = 2
+	minWidth           = 72
+	sidebarWidth       = 28
+	queuePaneWidth     = 34
+	minPlayerPaneWidth = 54
+	paneGapWidth       = 1
+	compactAtWidth     = 92
+	queueAtWidth       = sidebarWidth + minPlayerPaneWidth + queuePaneWidth + 2*paneGapWidth
+	borderChrome       = 2
 )
 
 func (m Model) renderApp() string {
@@ -62,10 +65,22 @@ func (m Model) renderBody(width int) string {
 	}
 
 	left := m.renderRooms(sidebarWidth)
+	if m.showQueuePane(width) {
+		rightWidth := width - sidebarWidth - queuePaneWidth - 2*paneGapWidth
+		right := m.renderRightPane(rightWidth)
+		queue := m.renderQueue(queuePaneWidth)
+		separatorHeight := max(lipgloss.Height(left), max(lipgloss.Height(right), lipgloss.Height(queue)))
+		return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), right, paneGap(separatorHeight), queue)
+	}
+
 	rightWidth := width - sidebarWidth - paneGapWidth
 	right := m.renderRightPane(rightWidth)
 	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(right))
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), right)
+}
+
+func (m Model) showQueuePane(width int) bool {
+	return width >= queueAtWidth
 }
 
 func (m Model) renderHeader(width int) string {
@@ -124,6 +139,89 @@ func (m Model) renderRooms(width int) string {
 	}
 
 	return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderQueue(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	style := panelStyle.Copy()
+	if m.dashboardFocus == focusQueue {
+		style = style.BorderForeground(colorSelected)
+	}
+	return style.Width(contentWidth).Render(m.renderQueueContent(contentWidth))
+}
+
+func (m Model) renderQueueContent(width int) string {
+	rowWidth := max(1, width-panelStyle.GetHorizontalPadding())
+	lines := []string{labelStyle.Width(rowWidth).Render("Queue")}
+	if m.queueTotal > 0 {
+		lines = append(lines, subtitleStyle.Width(rowWidth).Render(fmt.Sprintf("%d tracks", m.queueTotal)))
+	}
+	if m.queueErr != nil {
+		lines = append(lines, "")
+		lines = append(lines, errorStyle.Width(rowWidth).Render(displayText(m.queueErr.Error(), rowWidth)))
+		return paneBlock(rowWidth, lipgloss.Height(strings.Join(lines, "\n"))).Render(strings.Join(lines, "\n"))
+	}
+	if m.queueLoading && len(m.queueItems) == 0 {
+		lines = append(lines, "")
+		lines = append(lines, spinnerStyle.Width(rowWidth).Render(m.spinner()+" loading queue"))
+		return paneBlock(rowWidth, lipgloss.Height(strings.Join(lines, "\n"))).Render(strings.Join(lines, "\n"))
+	}
+	if len(m.queueItems) == 0 {
+		lines = append(lines, "")
+		lines = append(lines, hintStyle.Width(rowWidth).Render("Queue is empty"))
+		return paneBlock(rowWidth, lipgloss.Height(strings.Join(lines, "\n"))).Render(strings.Join(lines, "\n"))
+	}
+
+	visible := min(m.queueVisibleRows(), len(m.queueItems)-m.queueOffset)
+	for i := 0; i < visible; i++ {
+		index := m.queueOffset + i
+		item := m.queueItems[index]
+		lines = append(lines, queueRow(item, rowWidth, index == m.queueIndex, item.Position == m.status.QueuePosition))
+	}
+	if m.queueOffset+visible < len(m.queueItems) {
+		lines = append(lines, subtitleStyle.Width(rowWidth).Render(fmt.Sprintf("+%d more", len(m.queueItems)-m.queueOffset-visible)))
+	}
+	if m.dashboardFocus == focusQueue {
+		lines = append(lines, "")
+		lines = append(lines, hintStyle.Width(rowWidth).Render("enter play  x remove  [] move"))
+	}
+	return paneBlock(rowWidth, lipgloss.Height(strings.Join(lines, "\n"))).Render(strings.Join(lines, "\n"))
+}
+
+func queueRow(item QueueItem, width int, selected, playing bool) string {
+	marker := " "
+	if playing {
+		marker = "▶"
+	} else if selected {
+		marker = "▸"
+	}
+	detail := strings.TrimSpace(item.Artist)
+	if detail == "" {
+		detail = strings.TrimSpace(item.Album)
+	}
+	title := empty(item.Title, item.URI)
+	if strings.TrimSpace(title) == "" {
+		title = "Untitled"
+	}
+	text := fmt.Sprintf("%2d %s", item.Position, title)
+	if detail != "" {
+		text += " - " + detail
+	}
+	contentWidth := max(1, width-lipgloss.Width(marker))
+	markerView := paneText(marker)
+	if playing || selected {
+		markerView = accentStyle.Render(marker)
+	}
+	if selected {
+		contentWidth = max(1, contentWidth-selectedStyle.GetHorizontalPadding())
+		content := selectedStyle.Width(width - lipgloss.Width(marker)).Render(displayText(text, contentWidth))
+		return paneBlock(width, 1).Render(markerView + content)
+	}
+	content := subtitleStyle.Width(contentWidth).Render(displayText(text, contentWidth))
+	if playing {
+		content = titleStyle.Width(contentWidth).Render(displayText(text, contentWidth))
+	}
+	return paneBlock(width, 1).Render(markerView + content)
 }
 
 func (m Model) renderNowPlaying(width int) string {
@@ -512,7 +610,7 @@ func (m Model) renderFooterContent(width int) string {
 	} else if m.message != "" {
 		status = footerMessageStyle().Render(displayText(m.message, max(10, width-8)))
 	} else {
-		status = footerHintStyle().Render("q quit  tab switch  r refresh  ctrl+v theme")
+		status = footerHintStyle().Render("q quit  tab queue  r refresh  ctrl+v theme")
 	}
 
 	theme := themePill(m.themeName)
@@ -525,6 +623,8 @@ func (m Model) renderFooterContent(width int) string {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
 	} else if m.mode == modePlaybackConfig {
 		keys = "space toggle  esc close"
+	} else if m.dashboardFocus == focusQueue {
+		keys = "enter play  x remove  [] move  X clear  esc"
 	}
 	themeWidth := 0
 	if theme != "" {
@@ -573,6 +673,11 @@ func footerKeys(value string, width int) string {
 		choices = append(choices,
 			"space toggle  esc",
 			"toggle  esc",
+		)
+	case "enter play  x remove  [] move  X clear  esc":
+		choices = append(choices,
+			"enter play  x remove  [] move  esc",
+			"enter  x  []  esc",
 		)
 	default:
 		choices = append(choices,

@@ -67,6 +67,30 @@ func (c *Client) PlayQueuePosition(ctx context.Context, position int) error {
 	return c.playFromQueueTrack(ctx, position)
 }
 
+func (c *Client) MoveQueuePosition(ctx context.Context, fromPosition, toPosition int) error {
+	if fromPosition <= 0 {
+		return fmt.Errorf("from position must be >= 1")
+	}
+	if toPosition <= 0 {
+		return fmt.Errorf("to position must be >= 1")
+	}
+	if fromPosition == toPosition {
+		return nil
+	}
+	insertBefore := toPosition - 1
+	if fromPosition < toPosition {
+		insertBefore = toPosition
+	}
+	_, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "ReorderTracksInQueue", map[string]string{
+		"InstanceID":     "0",
+		"StartingIndex":  strconv.Itoa(fromPosition - 1),
+		"NumberOfTracks": "1",
+		"InsertBefore":   strconv.Itoa(insertBefore),
+		"UpdateID":       "0",
+	})
+	return err
+}
+
 // PlayFromQueueTrack binds the speaker's AVTransport to its queue and starts
 // playback at the given 1-based track number.
 func (c *Client) PlayFromQueueTrack(ctx context.Context, oneBasedTrackNumber int) error {

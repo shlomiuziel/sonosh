@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,22 @@ type Status struct {
 	Muted            bool
 	CrossfadeEnabled bool
 	CrossfadeKnown   bool
+	QueuePosition    int
+}
+
+type QueueItem struct {
+	Position int
+	Title    string
+	Artist   string
+	Album    string
+	URI      string
+}
+
+type QueuePage struct {
+	Items          []QueueItem
+	NumberReturned int
+	TotalMatches   int
+	UpdateID       int
 }
 
 type SearchResult struct {
@@ -53,6 +70,11 @@ type Backend interface {
 	SetVolume(context.Context, Room, int) error
 	ToggleMute(context.Context, Room) error
 	ToggleCrossfade(context.Context, Room) (bool, error)
+	Queue(context.Context, Room, int, int) (QueuePage, error)
+	PlayQueuePosition(context.Context, Room, int) error
+	RemoveQueuePosition(context.Context, Room, int) error
+	ClearQueue(context.Context, Room) error
+	MoveQueuePosition(context.Context, Room, int, int) error
 	Search(context.Context, Room, string, string, string, int) ([]SearchResult, error)
 	BrowsePlaylist(context.Context, Room, string, SearchResult, int) ([]SearchResult, error)
 	PlaySearchResult(context.Context, Room, string, SearchResult) error
@@ -132,6 +154,10 @@ func (b *SonosBackend) Status(ctx context.Context, room Room) (Status, error) {
 		return Status{}, err
 	}
 	crossfade, crossfadeErr := transportClient.GetCrossfadeMode(ctx)
+	queuePosition := 0
+	if n, err := strconv.Atoi(strings.TrimSpace(position.Track)); err == nil && n > 0 {
+		queuePosition = n
+	}
 
 	status := Status{
 		State:            strings.TrimSpace(transport.State),
@@ -141,6 +167,7 @@ func (b *SonosBackend) Status(ctx context.Context, room Room) (Status, error) {
 		Muted:            muted,
 		CrossfadeEnabled: crossfade,
 		CrossfadeKnown:   crossfadeErr == nil,
+		QueuePosition:    queuePosition,
 	}
 	if item, ok := sonos.ParseNowPlaying(position.TrackMeta); ok {
 		status.Title = strings.TrimSpace(item.Title)
@@ -196,6 +223,45 @@ func (b *SonosBackend) ToggleCrossfade(ctx context.Context, room Room) (bool, er
 		return false, err
 	}
 	return next, nil
+}
+
+func (b *SonosBackend) Queue(ctx context.Context, room Room, start, count int) (QueuePage, error) {
+	page, err := sonos.NewClient(room.transportIP(), b.Timeout).ListQueue(ctx, start, count)
+	if err != nil {
+		return QueuePage{}, err
+	}
+	items := make([]QueueItem, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, QueueItem{
+			Position: item.Position,
+			Title:    strings.TrimSpace(item.Item.Title),
+			Artist:   strings.TrimSpace(item.Item.Artist),
+			Album:    strings.TrimSpace(item.Item.Album),
+			URI:      strings.TrimSpace(item.Item.URI),
+		})
+	}
+	return QueuePage{
+		Items:          items,
+		NumberReturned: page.NumberReturned,
+		TotalMatches:   page.TotalMatches,
+		UpdateID:       page.UpdateID,
+	}, nil
+}
+
+func (b *SonosBackend) PlayQueuePosition(ctx context.Context, room Room, position int) error {
+	return sonos.NewClient(room.transportIP(), b.Timeout).PlayQueuePosition(ctx, position)
+}
+
+func (b *SonosBackend) RemoveQueuePosition(ctx context.Context, room Room, position int) error {
+	return sonos.NewClient(room.transportIP(), b.Timeout).RemoveQueuePosition(ctx, position)
+}
+
+func (b *SonosBackend) ClearQueue(ctx context.Context, room Room) error {
+	return sonos.NewClient(room.transportIP(), b.Timeout).ClearQueue(ctx)
+}
+
+func (b *SonosBackend) MoveQueuePosition(ctx context.Context, room Room, fromPosition, toPosition int) error {
+	return sonos.NewClient(room.transportIP(), b.Timeout).MoveQueuePosition(ctx, fromPosition, toPosition)
 }
 
 func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, category, query string, limit int) ([]SearchResult, error) {

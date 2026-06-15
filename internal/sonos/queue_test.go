@@ -2,6 +2,7 @@ package sonos
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -85,4 +86,70 @@ func TestQueueListAndActions(t *testing.T) {
 
 	// Not asserting network body here (covered by playFromQueueTrack tests).
 	_ = c.PlayQueuePosition(context.Background(), 1)
+}
+
+func TestMoveQueuePosition(t *testing.T) {
+	t.Parallel()
+
+	var bodies []string
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		action := r.Header.Get("SOAPACTION")
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(action, "AVTransport:1#ReorderTracksInQueue") {
+			t.Fatalf("unexpected SOAPACTION: %q", action)
+		}
+		bodies = append(bodies, string(body))
+		return httpResponse(200, `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:ReorderTracksInQueueResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"></u:ReorderTracksInQueueResponse></s:Body></s:Envelope>`), nil
+	})
+
+	c := &Client{
+		IP: "192.0.2.1",
+		HTTP: &http.Client{
+			Timeout:   time.Second,
+			Transport: rt,
+		},
+	}
+
+	if err := c.MoveQueuePosition(context.Background(), 0, 1); err == nil {
+		t.Fatal("expected invalid from position error")
+	}
+	if err := c.MoveQueuePosition(context.Background(), 1, 0); err == nil {
+		t.Fatal("expected invalid to position error")
+	}
+	if err := c.MoveQueuePosition(context.Background(), 2, 2); err != nil {
+		t.Fatalf("same-position move should be a no-op: %v", err)
+	}
+	if len(bodies) != 0 {
+		t.Fatalf("same-position move sent SOAP call: %d", len(bodies))
+	}
+
+	if err := c.MoveQueuePosition(context.Background(), 2, 3); err != nil {
+		t.Fatalf("move down: %v", err)
+	}
+	if err := c.MoveQueuePosition(context.Background(), 3, 2); err != nil {
+		t.Fatalf("move up: %v", err)
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("SOAP calls = %d, want 2", len(bodies))
+	}
+	for _, want := range []string{
+		"<StartingIndex>1</StartingIndex>",
+		"<NumberOfTracks>1</NumberOfTracks>",
+		"<InsertBefore>3</InsertBefore>",
+		"<UpdateID>0</UpdateID>",
+	} {
+		if !strings.Contains(bodies[0], want) {
+			t.Fatalf("move down body missing %s: %s", want, bodies[0])
+		}
+	}
+	for _, want := range []string{
+		"<StartingIndex>2</StartingIndex>",
+		"<NumberOfTracks>1</NumberOfTracks>",
+		"<InsertBefore>1</InsertBefore>",
+		"<UpdateID>0</UpdateID>",
+	} {
+		if !strings.Contains(bodies[1], want) {
+			t.Fatalf("move up body missing %s: %s", want, bodies[1])
+		}
+	}
 }

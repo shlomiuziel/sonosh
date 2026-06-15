@@ -711,6 +711,128 @@ func TestWideBodyKeepsPaneWidthsAligned(t *testing.T) {
 	}
 }
 
+func TestWideBodyRendersQueuePane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 132
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+	model.queueItems = []QueueItem{
+		{Position: 1, Title: "Track One", Artist: "Artist One"},
+		{Position: 2, Title: "Track Two", Artist: "Artist Two"},
+	}
+	model.queueTotal = 2
+	model.status.QueuePosition = 2
+
+	body := model.renderBody(130)
+	if got := lipgloss.Width(body); got != 130 {
+		t.Fatalf("body width = %d, want 130:\n%s", got, body)
+	}
+	for _, want := range []string{"QUEUE", "Track One", "Track Two"} {
+		if !strings.Contains(strings.ToUpper(body), strings.ToUpper(want)) {
+			t.Fatalf("queue body missing %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestCompactBodyHidesQueuePane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 100
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+	model.queueItems = []QueueItem{{Position: 1, Title: "Track One"}}
+	body := model.renderBody(98)
+	if strings.Contains(strings.ToUpper(body), "QUEUE") || strings.Contains(body, "Track One") {
+		t.Fatalf("compact body unexpectedly rendered queue:\n%s", body)
+	}
+}
+
+func TestDashboardTabFocusesQueueWhenVisible(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 132
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+
+	updated, cmd := model.Update(key("tab"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command when focusing queue")
+	}
+	if model.dashboardFocus != focusQueue {
+		t.Fatalf("focus = %v, want queue", model.dashboardFocus)
+	}
+
+	updated, _ = model.Update(key("/"))
+	model = updated.(Model)
+	if model.mode != modeSearch {
+		t.Fatalf("mode = %v, want search", model.mode)
+	}
+}
+
+func TestQueueFocusDispatchesActions(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Living Room", IP: "192.0.2.10"}},
+		queuePage: QueuePage{Items: []QueueItem{
+			{Position: 1, Title: "Track One"},
+			{Position: 2, Title: "Track Two"},
+			{Position: 3, Title: "Track Three"},
+		}, TotalMatches: 3},
+	}
+	model := NewModel(backend, testConfig())
+	model.width = 132
+	model.rooms = backend.rooms
+	model.queueItems = append([]QueueItem{}, backend.queuePage.Items...)
+	model.queueTotal = 3
+	model.dashboardFocus = focusQueue
+	model.queueIndex = 1
+
+	updated, cmd := model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected queue play command")
+	}
+	_ = runCmd(cmd)
+	if backend.playQueuePosition != 2 {
+		t.Fatalf("play queue position = %d, want 2", backend.playQueuePosition)
+	}
+
+	updated, cmd = model.Update(key("x"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected queue remove command")
+	}
+	_ = runCmd(cmd)
+	if backend.removeQueuePosition != 2 {
+		t.Fatalf("remove queue position = %d, want 2", backend.removeQueuePosition)
+	}
+
+	updated, cmd = model.Update(key("["))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected queue move-up command")
+	}
+	_ = runCmd(cmd)
+	if backend.moveFrom != 2 || backend.moveTo != 1 {
+		t.Fatalf("move = %d -> %d, want 2 -> 1", backend.moveFrom, backend.moveTo)
+	}
+
+	updated, cmd = model.Update(key("]"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected queue move-down command")
+	}
+	_ = runCmd(cmd)
+	if backend.moveFrom != 1 || backend.moveTo != 2 {
+		t.Fatalf("move = %d -> %d, want 1 -> 2", backend.moveFrom, backend.moveTo)
+	}
+
+	updated, cmd = model.Update(key("X"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected queue clear command")
+	}
+	_ = runCmd(cmd)
+	if !backend.clearedQueue {
+		t.Fatal("expected queue clear")
+	}
+}
+
 func testConfig() Config {
 	return Config{Timeout: time.Second, SearchService: "Spotify", SearchCategory: "tracks", SearchLimit: 10}
 }
@@ -721,6 +843,8 @@ func key(value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "esc":
 		return tea.KeyMsg{Type: tea.KeyEsc}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
 	case "ctrl+p":
@@ -747,18 +871,24 @@ func runCmd(cmd tea.Cmd) tea.Msg {
 }
 
 type fakeBackend struct {
-	rooms            []Room
-	status           Status
-	results          []SearchResult
-	searchFn         func(query string) []SearchResult
-	browseFn         func(id string) []SearchResult
-	transportAction  string
-	volume           int
-	muted            bool
-	crossfade        bool
-	played           sonos.SMAPIItem
-	searchQueries    []string
-	searchCategories []string
+	rooms               []Room
+	status              Status
+	results             []SearchResult
+	searchFn            func(query string) []SearchResult
+	browseFn            func(id string) []SearchResult
+	transportAction     string
+	volume              int
+	muted               bool
+	crossfade           bool
+	queuePage           QueuePage
+	playQueuePosition   int
+	removeQueuePosition int
+	clearedQueue        bool
+	moveFrom            int
+	moveTo              int
+	played              sonos.SMAPIItem
+	searchQueries       []string
+	searchCategories    []string
 }
 
 func (f *fakeBackend) Discover(context.Context) ([]Room, error) {
@@ -787,6 +917,31 @@ func (f *fakeBackend) ToggleMute(context.Context, Room) error {
 func (f *fakeBackend) ToggleCrossfade(context.Context, Room) (bool, error) {
 	f.crossfade = !f.crossfade
 	return f.crossfade, nil
+}
+
+func (f *fakeBackend) Queue(context.Context, Room, int, int) (QueuePage, error) {
+	return f.queuePage, nil
+}
+
+func (f *fakeBackend) PlayQueuePosition(_ context.Context, _ Room, position int) error {
+	f.playQueuePosition = position
+	return nil
+}
+
+func (f *fakeBackend) RemoveQueuePosition(_ context.Context, _ Room, position int) error {
+	f.removeQueuePosition = position
+	return nil
+}
+
+func (f *fakeBackend) ClearQueue(context.Context, Room) error {
+	f.clearedQueue = true
+	return nil
+}
+
+func (f *fakeBackend) MoveQueuePosition(_ context.Context, _ Room, fromPosition, toPosition int) error {
+	f.moveFrom = fromPosition
+	f.moveTo = toPosition
+	return nil
 }
 
 func (f *fakeBackend) Search(_ context.Context, _ Room, _, category, query string, _ int) ([]SearchResult, error) {

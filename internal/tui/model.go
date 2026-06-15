@@ -16,6 +16,7 @@ const (
 	refreshEvery         = 5 * time.Second
 	spinnerEvery         = 120 * time.Millisecond
 	playlistPreviewLimit = 6
+	queuePageSize        = 50
 )
 
 type Config struct {
@@ -56,17 +57,30 @@ type Model struct {
 	searchPreviewLoading    bool
 	searchPreviewGeneration int
 	searchPreviewItems      []SearchResult
+	queueItems              []QueueItem
+	queueTotal              int
+	queueIndex              int
+	queueOffset             int
+	queueLoading            bool
+	queueErr                error
+	dashboardFocus          dashboardFocus
 
 	width  int
 	height int
 }
 
 type mode int
+type dashboardFocus int
 
 const (
 	modeDashboard mode = iota
 	modeSearch
 	modePlaybackConfig
+)
+
+const (
+	focusMain dashboardFocus = iota
+	focusQueue
 )
 
 type roomsMsg struct {
@@ -92,6 +106,17 @@ type actionMsg struct {
 
 type crossfadeMsg struct {
 	enabled bool
+	err     error
+}
+
+type queueMsg struct {
+	items []QueueItem
+	total int
+	err   error
+}
+
+type queueActionMsg struct {
+	message string
 	err     error
 }
 
@@ -178,7 +203,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, statusCmd(m.backend, m.config.Timeout, m.selectedRoom())
+		m.queueLoading = true
+		m.queueErr = nil
+		m.queueItems = nil
+		m.queueTotal = 0
+		m.queueIndex = 0
+		m.queueOffset = 0
+		return m, tea.Batch(
+			statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+			queueCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+		)
 	case statusMsg:
 		m.loading = false
 		m.err = msg.err
@@ -238,6 +272,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case queueMsg:
+		m.queueLoading = false
+		m.queueErr = msg.err
+		if msg.err == nil {
+			m.queueItems = msg.items
+			m.queueTotal = msg.total
+			m.clampQueueSelection()
+		}
+		return m, nil
+	case queueActionMsg:
+		m.loading = false
+		m.err = msg.err
+		if msg.err == nil {
+			m.message = msg.message
+			if len(m.rooms) > 0 {
+				m.loading = true
+				m.queueLoading = true
+				m.queueErr = nil
+				return m, tea.Batch(
+					statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+					queueCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+					spinnerCmd(),
+				)
+			}
+		}
+		return m, nil
 	case searchMsg:
 		m.loading = false
 		m.err = msg.err
@@ -264,7 +324,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tickMsg:
 		if len(m.rooms) > 0 && !m.loading {
-			return m, tea.Batch(statusCmd(m.backend, m.config.Timeout, m.selectedRoom()), tickCmd())
+			cmds := []tea.Cmd{
+				statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+				tickCmd(),
+			}
+			if !m.queueLoading {
+				m.queueLoading = true
+				m.queueErr = nil
+				cmds = append(cmds, queueCmd(m.backend, m.config.Timeout, m.selectedRoom()))
+			}
+			return m, tea.Batch(cmds...)
 		}
 		return m, tickCmd()
 	case spinnerMsg:
@@ -324,15 +393,25 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	case "tab":
+		m.toggleDashboardFocus()
+		m.err = nil
+		return m, nil
+	case "/":
 		m.mode = modeSearch
 		m.err = nil
 		return m, nil
+	case "o":
+		m.mode = modePlaybackConfig
+		m.err = nil
+		return m, nil
 	case "esc":
+		m.dashboardFocus = focusMain
 		m.mode = modeDashboard
 		m.err = nil
 		return m, nil
 	case "r":
 		m.loading = true
+		m.dashboardFocus = focusMain
 		m.err = nil
 		return m, tea.Batch(discoverCmd(m.backend, m.config.Timeout), spinnerCmd())
 	}
@@ -341,6 +420,9 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.dashboardFocus == focusQueue {
+		return m.updateQueueKey(msg)
+	}
 	if len(m.rooms) == 0 {
 		return m, nil
 	}
@@ -349,13 +431,25 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.roomIndex > 0 {
 			m.roomIndex--
 			m.loading = true
-			return m, tea.Batch(statusCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+			m.queueLoading = true
+			m.queueErr = nil
+			return m, tea.Batch(
+				statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+				queueCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+				spinnerCmd(),
+			)
 		}
 	case "down", "j":
 		if m.roomIndex < len(m.rooms)-1 {
 			m.roomIndex++
 			m.loading = true
-			return m, tea.Batch(statusCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+			m.queueLoading = true
+			m.queueErr = nil
+			return m, tea.Batch(
+				statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+				queueCmd(m.backend, m.config.Timeout, m.selectedRoom()),
+				spinnerCmd(),
+			)
 		}
 	case " ", "enter":
 		m.loading = true
@@ -382,16 +476,73 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "m":
 		m.loading = true
 		return m, tea.Batch(muteCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
-	case "o":
-		m.mode = modePlaybackConfig
-		m.err = nil
-		return m, nil
-	case "/":
-		m.mode = modeSearch
-		m.err = nil
-		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) updateQueueKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.dashboardFocus = focusMain
+		return m, nil
+	case "up", "k":
+		if m.queueIndex > 0 {
+			m.queueIndex--
+			m.ensureQueueSelectionVisible()
+		}
+		return m, nil
+	case "down", "j":
+		if m.queueIndex < len(m.queueItems)-1 {
+			m.queueIndex++
+			m.ensureQueueSelectionVisible()
+		}
+		return m, nil
+	case "enter":
+		item, ok := m.selectedQueueItem()
+		if !ok {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		return m, tea.Batch(queuePlayCmd(m.backend, m.config.Timeout, m.selectedRoom(), item.Position), spinnerCmd())
+	case "x":
+		item, ok := m.selectedQueueItem()
+		if !ok {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		return m, tea.Batch(queueRemoveCmd(m.backend, m.config.Timeout, m.selectedRoom(), item.Position), spinnerCmd())
+	case "X":
+		if len(m.queueItems) == 0 {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		return m, tea.Batch(queueClearCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+	case "[":
+		item, ok := m.selectedQueueItem()
+		if !ok || item.Position <= 1 || m.queueIndex <= 0 {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		m.queueIndex--
+		m.ensureQueueSelectionVisible()
+		return m, tea.Batch(queueMoveCmd(m.backend, m.config.Timeout, m.selectedRoom(), item.Position, item.Position-1), spinnerCmd())
+	case "]":
+		item, ok := m.selectedQueueItem()
+		if !ok || m.queueIndex >= len(m.queueItems)-1 {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		m.queueIndex++
+		m.ensureQueueSelectionVisible()
+		return m, tea.Batch(queueMoveCmd(m.backend, m.config.Timeout, m.selectedRoom(), item.Position, item.Position+1), spinnerCmd())
+	default:
+		return m, nil
+	}
 }
 
 func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -525,6 +676,77 @@ func (m *Model) resetPlaylistPreview() {
 	m.searchPreviewItems = nil
 }
 
+func (m *Model) toggleDashboardFocus() {
+	if !m.queuePaneVisible() {
+		m.dashboardFocus = focusMain
+		return
+	}
+	if m.dashboardFocus == focusQueue {
+		m.dashboardFocus = focusMain
+		return
+	}
+	m.dashboardFocus = focusQueue
+}
+
+func (m Model) queuePaneVisible() bool {
+	width := m.width
+	if width <= 0 {
+		width = 100
+	}
+	return width-2 >= queueAtWidth
+}
+
+func (m *Model) clampQueueSelection() {
+	if len(m.queueItems) == 0 {
+		m.queueIndex = 0
+		m.queueOffset = 0
+		return
+	}
+	if m.queueIndex < 0 {
+		m.queueIndex = 0
+	}
+	if m.queueIndex >= len(m.queueItems) {
+		m.queueIndex = len(m.queueItems) - 1
+	}
+	m.ensureQueueSelectionVisible()
+}
+
+func (m *Model) ensureQueueSelectionVisible() {
+	if len(m.queueItems) == 0 {
+		m.queueOffset = 0
+		return
+	}
+	visible := m.queueVisibleRows()
+	if m.queueIndex < m.queueOffset {
+		m.queueOffset = m.queueIndex
+	}
+	if m.queueIndex >= m.queueOffset+visible {
+		m.queueOffset = m.queueIndex - visible + 1
+	}
+	maxOffset := max(0, len(m.queueItems)-visible)
+	if m.queueOffset > maxOffset {
+		m.queueOffset = maxOffset
+	}
+	if m.queueOffset < 0 {
+		m.queueOffset = 0
+	}
+}
+
+func (m Model) queueVisibleRows() int {
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
+	return max(3, height-8)
+}
+
+func (m Model) selectedQueueItem() (QueueItem, bool) {
+	if len(m.queueItems) == 0 || m.queueIndex < 0 || m.queueIndex >= len(m.queueItems) {
+		return QueueItem{}, false
+	}
+	return m.queueItems[m.queueIndex], true
+}
+
 func (m Model) View() string {
 	return m.renderApp()
 }
@@ -599,6 +821,15 @@ func statusCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
 	}
 }
 
+func queueCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		page, err := backend.Queue(ctx, room, 0, queuePageSize)
+		return queueMsg{items: page.Items, total: page.TotalMatches, err: err}
+	}
+}
+
 func transportCmd(backend Backend, timeout time.Duration, room Room, action string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -623,6 +854,42 @@ func muteCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
 		defer cancel()
 		err := backend.ToggleMute(ctx, room)
 		return actionMsg{message: "mute toggled", err: err}
+	}
+}
+
+func queuePlayCmd(backend Backend, timeout time.Duration, room Room, position int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		err := backend.PlayQueuePosition(ctx, room, position)
+		return queueActionMsg{message: fmt.Sprintf("queue play %d", position), err: err}
+	}
+}
+
+func queueRemoveCmd(backend Backend, timeout time.Duration, room Room, position int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		err := backend.RemoveQueuePosition(ctx, room, position)
+		return queueActionMsg{message: fmt.Sprintf("removed queue %d", position), err: err}
+	}
+}
+
+func queueClearCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		err := backend.ClearQueue(ctx, room)
+		return queueActionMsg{message: "queue cleared", err: err}
+	}
+}
+
+func queueMoveCmd(backend Backend, timeout time.Duration, room Room, fromPosition, toPosition int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		err := backend.MoveQueuePosition(ctx, room, fromPosition, toPosition)
+		return queueActionMsg{message: fmt.Sprintf("moved queue %d to %d", fromPosition, toPosition), err: err}
 	}
 }
 
