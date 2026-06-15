@@ -805,6 +805,86 @@ func TestCompactRoomsUseSingleLineRows(t *testing.T) {
 	}
 }
 
+func TestLayoutShortcutTogglesCompactMode(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+	}
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.LayoutConfigPath = filepath.Join(dir, "layout.json")
+	model := NewModel(backend, cfg)
+
+	updated, cmd := model.Update(key("ctrl+l"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect a command when toggling layout")
+	}
+	if !model.compactLayout {
+		t.Fatal("expected compact layout to toggle on")
+	}
+	if model.message != "layout: compact" {
+		t.Fatalf("layout message = %q, want compact announcement", model.message)
+	}
+	if _, err := os.Stat(cfg.LayoutConfigPath); err != nil {
+		t.Fatalf("layout config not written: %v", err)
+	}
+	stored, err := LoadCompactLayout(cfg.LayoutConfigPath)
+	if err != nil {
+		t.Fatalf("LoadCompactLayout: %v", err)
+	}
+	if !stored {
+		t.Fatal("stored compact layout = false, want true")
+	}
+}
+
+func TestCompactLayoutHidesSidePanes(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.compactLayout = true
+	model.width = 130
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+	model.queueItems = []QueueItem{{Position: 1, Title: "Track One"}}
+	model.status = Status{Title: "Track One", Artist: "Artist"}
+
+	body := model.renderAppContent(128)
+	if strings.Contains(strings.ToUpper(body), "ROOMS") {
+		t.Fatalf("compact layout unexpectedly rendered rooms pane:\n%s", body)
+	}
+	if strings.Contains(strings.ToUpper(body), "QUEUE") {
+		t.Fatalf("compact layout unexpectedly rendered queue pane:\n%s", body)
+	}
+	if !strings.Contains(strings.ToUpper(body), "NOW PLAYING") {
+		t.Fatalf("compact layout missing main pane:\n%s", body)
+	}
+}
+
+func TestCompactCoverCentersArtwork(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.compactLayout = true
+	model.status = Status{
+		Title:    "Track",
+		Artist:   "Artist",
+		Album:    "Album",
+		AlbumArt: "http://example.test/art.jpg",
+	}
+	model.artURL = model.status.AlbumArt
+	model.artView = "▀▀▀▀\n▀▀▀▀"
+
+	cover := model.renderCover(28)
+	lines := strings.Split(cover, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.Contains(line, "▀▀▀▀") {
+			found = true
+			if !strings.Contains(line, "     ▀▀▀▀") {
+				t.Fatalf("compact cover art was not centered:\n%s", cover)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("compact cover did not render artwork:\n%s", cover)
+	}
+}
+
 func TestDashboardTabFocusesQueueWhenVisible(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 	model.width = 132
@@ -908,6 +988,8 @@ func key(value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyTab}
 	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
+	case "ctrl+l":
+		return tea.KeyMsg{Type: tea.KeyCtrlL}
 	case "ctrl+p":
 		return tea.KeyMsg{Type: tea.KeyCtrlP}
 	case "ctrl+v":

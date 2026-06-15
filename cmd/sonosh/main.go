@@ -16,9 +16,17 @@ func main() {
 	if err != nil {
 		themeConfigPath = ""
 	}
+	layoutConfigPath, err := tui.DefaultLayoutConfigPath()
+	if err != nil {
+		layoutConfigPath = ""
+	}
 	storedTheme, err := tui.LoadThemeName(themeConfigPath)
 	if err != nil {
 		storedTheme = ""
+	}
+	storedCompact, err := tui.LoadCompactLayout(layoutConfigPath)
+	if err != nil {
+		storedCompact = false
 	}
 	defaultTheme := "aurora"
 	if storedTheme != "" {
@@ -33,13 +41,15 @@ func main() {
 	flag.Parse()
 
 	cfg := tui.Config{
-		Timeout:         normalizeTimeout(*timeout),
-		SearchService:   *service,
-		SearchCategory:  *category,
-		SearchLimit:     *limit,
-		Theme:           *theme,
-		ThemeConfigPath: themeConfigPath,
-		MacHelperPath:   *macHelperPath,
+		Timeout:          normalizeTimeout(*timeout),
+		SearchService:    *service,
+		SearchCategory:   *category,
+		SearchLimit:      *limit,
+		Theme:            *theme,
+		ThemeConfigPath:  themeConfigPath,
+		Compact:          storedCompact,
+		LayoutConfigPath: layoutConfigPath,
+		MacHelperPath:    *macHelperPath,
 	}
 	model := tui.NewModel(tui.NewSonosBackend(cfg.Timeout), cfg)
 	program := tea.NewProgram(model, tea.WithAltScreen())

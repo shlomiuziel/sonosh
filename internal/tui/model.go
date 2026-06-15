@@ -20,13 +20,15 @@ const (
 )
 
 type Config struct {
-	Timeout         time.Duration
-	SearchService   string
-	SearchCategory  string
-	SearchLimit     int
-	MacHelperPath   string
-	Theme           string
-	ThemeConfigPath string
+	Timeout          time.Duration
+	SearchService    string
+	SearchCategory   string
+	SearchLimit      int
+	MacHelperPath    string
+	Theme            string
+	ThemeConfigPath  string
+	Compact          bool
+	LayoutConfigPath string
 }
 
 type Model struct {
@@ -64,6 +66,7 @@ type Model struct {
 	queueLoading            bool
 	queueErr                error
 	dashboardFocus          dashboardFocus
+	compactLayout           bool
 
 	width  int
 	height int
@@ -173,6 +176,7 @@ func NewModel(backend Backend, cfg Config) Model {
 		loading:        true,
 		searchCategory: cfg.SearchCategory,
 		themeName:      themeName,
+		compactLayout:  cfg.Compact,
 	}
 }
 
@@ -371,6 +375,18 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "ctrl+l":
+		m.compactLayout = !m.compactLayout
+		m.dashboardFocus = focusMain
+		if err := SaveCompactLayout(m.config.LayoutConfigPath, m.compactLayout); err != nil {
+			m.message = "layout save failed: " + err.Error()
+		} else if m.compactLayout {
+			m.message = "layout: compact"
+		} else {
+			m.message = "layout: full"
+		}
+		m.err = nil
+		return m, nil
 	case "ctrl+v":
 		m.themeName = cycleTheme()
 		if err := SaveThemeName(m.config.ThemeConfigPath, m.themeName); err != nil {
@@ -677,7 +693,7 @@ func (m *Model) resetPlaylistPreview() {
 }
 
 func (m *Model) toggleDashboardFocus() {
-	if !m.queuePaneVisible() {
+	if !m.queuePaneVisible() || m.compactLayout {
 		m.dashboardFocus = focusMain
 		return
 	}
@@ -689,6 +705,9 @@ func (m *Model) toggleDashboardFocus() {
 }
 
 func (m Model) queuePaneVisible() bool {
+	if m.compactLayout {
+		return false
+	}
 	width := m.width
 	if width <= 0 {
 		width = 100

@@ -42,6 +42,9 @@ func (m Model) renderApp() string {
 }
 
 func (m Model) renderAppContent(width int) string {
+	if m.compactLayout {
+		return m.renderCompactAppContent(width)
+	}
 	if width < compactAtWidth {
 		body := m.renderBody(width)
 		footer := m.renderFooterRow(width)
@@ -67,6 +70,15 @@ func (m Model) renderAppContent(width int) string {
 
 	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(center))
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), center)
+}
+
+func (m Model) renderCompactAppContent(width int) string {
+	contentWidth := max(1, min(width, 88))
+	main := m.renderRightPane(contentWidth)
+	spacer := lipgloss.NewStyle().Width(contentWidth).Height(1).Render("")
+	footer := m.renderFooterPane(contentWidth)
+	stack := lipgloss.JoinVertical(lipgloss.Left, main, spacer, footer)
+	return lipgloss.PlaceHorizontal(width, lipgloss.Center, stack)
 }
 
 func (m Model) renderBody(width int) string {
@@ -290,7 +302,13 @@ func (m Model) renderNowPlayingContent(width int) string {
 	if m.mode == modeSearch {
 		content = lipgloss.JoinVertical(lipgloss.Center, details)
 	} else if width < compactAtWidth {
+		if m.compactLayout {
+			coverWidth = min(24, innerWidth)
+		}
 		cover := m.renderCover(coverWidth)
+		if m.compactLayout {
+			cover = lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, cover, lipgloss.WithWhitespaceBackground(colorPanel))
+		}
 		content = lipgloss.JoinVertical(lipgloss.Center, cover, details)
 	} else {
 		cover := m.renderCover(coverWidth)
@@ -334,7 +352,7 @@ func (m Model) renderCover(width int) string {
 	centerArt := true
 	if strings.TrimSpace(m.artView) != "" && m.artURL == strings.TrimSpace(m.status.AlbumArt) {
 		coverArt = renderCoverArt(innerWidth, m.artView)
-		centerArt = false
+		centerArt = !m.compactLayout
 	}
 	if centerArt {
 		coverArt = centerLine(innerWidth, coverArt)
@@ -679,7 +697,11 @@ func (m Model) renderFooterContent(width int) string {
 	} else if m.message != "" {
 		status = footerMessageStyle().Render(displayText(m.message, max(10, width-8)))
 	} else {
-		status = footerHintStyle().Render("q quit  tab queue  r refresh  ctrl+v theme")
+		hint := "q quit  tab queue  r refresh  ctrl+v theme"
+		if m.compactLayout {
+			hint = "q quit  ctrl+l full  r refresh  ctrl+v theme"
+		}
+		status = footerHintStyle().Render(hint)
 	}
 
 	theme := themePill(m.themeName)
@@ -687,13 +709,20 @@ func (m Model) renderFooterContent(width int) string {
 		theme = themePill(activeThemeName)
 	}
 	themeHint := footerHintStyle().Render("ctrl+v")
-	keys := "arrows/jk move  enter play  o options  / search"
+	layoutHint := "ctrl+l compact"
+	if m.compactLayout {
+		layoutHint = "ctrl+l full"
+	}
+	keys := layoutHint + "  arrows/jk move  enter play  o options  / search"
+	if m.compactLayout {
+		keys = layoutHint + "  o options  / search"
+	}
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
 	} else if m.mode == modePlaybackConfig {
 		keys = "space toggle  esc close"
 	} else if m.dashboardFocus == focusQueue {
-		keys = "enter play  x remove  [] move  X clear  esc"
+		keys = "enter play  x remove  [] move  X clear  esc  " + layoutHint
 	}
 	themeWidth := 0
 	if theme != "" {
