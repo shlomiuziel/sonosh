@@ -35,7 +35,7 @@ func (m Model) renderApp() string {
 
 	view := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
-	if m.mode == modeSearch && supportsKittyGraphics() {
+	if (m.mode == modeSearch || m.mode == modePlaybackConfig) && supportsKittyGraphics() {
 		return clearKittyGraphics() + rendered
 	}
 	return rendered
@@ -47,9 +47,12 @@ func (m Model) renderBody(width int) string {
 			m.renderHeader(width),
 			m.renderNowPlaying(width),
 		}
-		if m.mode == modeSearch {
+		switch m.mode {
+		case modeSearch:
 			sections = append(sections, m.renderSearchPanel(width))
-		} else {
+		case modePlaybackConfig:
+			sections = append(sections, m.renderPlaybackConfigPanel(width))
+		default:
 			sections = append(sections, m.renderRooms(width))
 		}
 		return lipgloss.JoinVertical(
@@ -157,11 +160,17 @@ func (m Model) renderNowPlayingContent(width int) string {
 
 func (m Model) renderRightPane(width int) string {
 	contentWidth := max(1, width-borderChrome)
-	if m.mode == modeSearch {
+	switch m.mode {
+	case modeSearch:
 		return panelStyle.
 			BorderForeground(colorSelected).
 			Width(contentWidth).
 			Render(m.renderSearchSpotlight(contentWidth))
+	case modePlaybackConfig:
+		return panelStyle.
+			BorderForeground(colorSelected).
+			Width(contentWidth).
+			Render(m.renderPlaybackConfigSpotlight(contentWidth))
 	}
 
 	var parts []string
@@ -276,10 +285,78 @@ func (m Model) renderTransport(width int) string {
 		keycap("s", "Stop"),
 		keycap("+/-", "Vol"),
 		keycap("m", "Mute"),
+		keycap("o", "Options"),
 		keycap("/", "Search"),
 	}
 	line := strings.Join(controls, paneSpace(2))
 	return truncate(line, width)
+}
+
+func (m Model) renderPlaybackConfigPanel(width int) string {
+	content := m.renderPlaybackConfigContent(max(1, width-borderChrome))
+	return panelStyle.BorderForeground(colorSelected).Width(max(1, width-borderChrome)).Render(content)
+}
+
+func (m Model) renderPlaybackConfigSpotlight(width int) string {
+	modalWidth := min(width-6, 58)
+	if modalWidth < 36 {
+		modalWidth = max(1, width-2)
+	}
+	content := m.renderPlaybackConfigContent(modalWidth)
+	modal := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSelected).
+		Padding(1, 2).
+		Width(modalWidth).
+		Background(colorPanel).
+		Render(content)
+	modalHeight := lipgloss.Height(modal)
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
+	targetHeight := max(modalHeight, height-6)
+	return lipgloss.Place(width, targetHeight, lipgloss.Center, lipgloss.Center, modal)
+}
+
+func (m Model) renderPlaybackConfigContent(width int) string {
+	contentWidth := max(1, width-borderChrome)
+	state := "unknown"
+	if m.status.CrossfadeKnown {
+		state = onOff(m.status.CrossfadeEnabled)
+	}
+	rows := []string{
+		labelStyle.Width(contentWidth).Render("Playback"),
+		playbackSettingRow("Crossfade", state, m.status.CrossfadeKnown, contentWidth),
+		"",
+		hintStyle.Width(contentWidth).Render("space toggle  esc close"),
+	}
+	return paneBlock(width, lipgloss.Height(strings.Join(rows, "\n"))).Render(strings.Join(rows, "\n"))
+}
+
+func playbackSettingRow(label, state string, known bool, width int) string {
+	pill := togglePill(state, known)
+	labelWidth := max(1, width-lipgloss.Width(pill)-2)
+	return lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		titleStyle.Width(labelWidth).Render(displayText(label, labelWidth)),
+		paneSpace(2),
+		pill,
+	)
+}
+
+func togglePill(value string, known bool) string {
+	style := lipgloss.NewStyle().
+		Padding(0, 1).
+		Bold(true).
+		Foreground(colorPanel)
+	if !known {
+		return style.Foreground(colorMuted).Background(colorPanelHi).Render("unknown")
+	}
+	if value == "on" {
+		return style.Background(colorAccent).Render("on")
+	}
+	return style.Background(colorSubtle).Foreground(colorInk).Render("off")
 }
 
 func (m Model) renderSearchPanel(width int) string {
@@ -443,9 +520,11 @@ func (m Model) renderFooterContent(width int) string {
 		theme = themePill(activeThemeName)
 	}
 	themeHint := footerHintStyle().Render("ctrl+v")
-	keys := "arrows/jk move  enter play  / search"
+	keys := "arrows/jk move  enter play  o options  / search"
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
+	} else if m.mode == modePlaybackConfig {
+		keys = "space toggle  esc close"
 	}
 	themeWidth := 0
 	if theme != "" {
@@ -490,9 +569,14 @@ func footerKeys(value string, width int) string {
 			"enter play  ctrl+t  ctrl+p  esc",
 			"enter  esc",
 		)
+	case "space toggle  esc close":
+		choices = append(choices,
+			"space toggle  esc",
+			"toggle  esc",
+		)
 	default:
 		choices = append(choices,
-			"move  enter  /",
+			"move  enter  o  /",
 			"/",
 		)
 	}

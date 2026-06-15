@@ -66,6 +66,7 @@ type mode int
 const (
 	modeDashboard mode = iota
 	modeSearch
+	modePlaybackConfig
 )
 
 type roomsMsg struct {
@@ -86,6 +87,11 @@ type albumArtMsg struct {
 
 type actionMsg struct {
 	message string
+	err     error
+}
+
+type crossfadeMsg struct {
+	enabled bool
 	err     error
 }
 
@@ -219,6 +225,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case crossfadeMsg:
+		m.loading = false
+		m.err = msg.err
+		if msg.err == nil {
+			m.status.CrossfadeEnabled = msg.enabled
+			m.status.CrossfadeKnown = true
+			m.message = "crossfade " + onOff(msg.enabled)
+			if len(m.rooms) > 0 {
+				m.loading = true
+				return m, statusCmd(m.backend, m.config.Timeout, m.selectedRoom())
+			}
+		}
+		return m, nil
 	case searchMsg:
 		m.loading = false
 		m.err = msg.err
@@ -297,6 +316,9 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.mode == modeSearch {
 		return m.updateSearchKey(msg)
 	}
+	if m.mode == modePlaybackConfig {
+		return m.updatePlaybackConfigKey(msg)
+	}
 
 	switch msg.String() {
 	case "q":
@@ -360,12 +382,34 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "m":
 		m.loading = true
 		return m, tea.Batch(muteCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+	case "o":
+		m.mode = modePlaybackConfig
+		m.err = nil
+		return m, nil
 	case "/":
 		m.mode = modeSearch
 		m.err = nil
 		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "tab", "esc", "q":
+		m.mode = modeDashboard
+		m.err = nil
+		return m, nil
+	case " ", "enter":
+		if len(m.rooms) == 0 {
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		return m, tea.Batch(crossfadeCmd(m.backend, m.config.Timeout, m.selectedRoom()), spinnerCmd())
+	default:
+		return m, nil
+	}
 }
 
 func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -582,6 +626,15 @@ func muteCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
 	}
 }
 
+func crossfadeCmd(backend Backend, timeout time.Duration, room Room) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		enabled, err := backend.ToggleCrossfade(ctx, room)
+		return crossfadeMsg{enabled: enabled, err: err}
+	}
+}
+
 func searchCmd(backend Backend, cfg Config, room Room, category, query string, generation int) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
@@ -708,6 +761,13 @@ func clamp(value, minValue, maxValue int) int {
 		return maxValue
 	}
 	return value
+}
+
+func onOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
 }
 
 func max(a, b int) int {

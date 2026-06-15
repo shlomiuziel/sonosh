@@ -107,6 +107,28 @@ func (c *Client) SetAVTransportURI(ctx context.Context, uri, meta string) error 
 	return err
 }
 
+func (c *Client) GetCrossfadeMode(ctx context.Context) (bool, error) {
+	resp, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "GetCrossfadeMode", map[string]string{
+		"InstanceID": "0",
+	})
+	if err != nil {
+		return false, err
+	}
+	return resp["CrossfadeMode"] == "1", nil
+}
+
+func (c *Client) SetCrossfadeMode(ctx context.Context, enabled bool) error {
+	mode := "0"
+	if enabled {
+		mode = "1"
+	}
+	_, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "SetCrossfadeMode", map[string]string{
+		"InstanceID":    "0",
+		"CrossfadeMode": mode,
+	})
+	return err
+}
+
 func (c *Client) BecomeCoordinatorOfStandaloneGroup(ctx context.Context) error {
 	_, err := c.soapCall(ctx, controlAVTransport, urnAVTransport, "BecomeCoordinatorOfStandaloneGroup", map[string]string{
 		"InstanceID": "0",

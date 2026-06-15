@@ -19,15 +19,17 @@ type Room struct {
 }
 
 type Status struct {
-	State    string
-	Title    string
-	Artist   string
-	Album    string
-	AlbumArt string
-	Position string
-	Duration string
-	Volume   int
-	Muted    bool
+	State            string
+	Title            string
+	Artist           string
+	Album            string
+	AlbumArt         string
+	Position         string
+	Duration         string
+	Volume           int
+	Muted            bool
+	CrossfadeEnabled bool
+	CrossfadeKnown   bool
 }
 
 type SearchResult struct {
@@ -50,6 +52,7 @@ type Backend interface {
 	Transport(context.Context, Room, string) error
 	SetVolume(context.Context, Room, int) error
 	ToggleMute(context.Context, Room) error
+	ToggleCrossfade(context.Context, Room) (bool, error)
 	Search(context.Context, Room, string, string, string, int) ([]SearchResult, error)
 	BrowsePlaylist(context.Context, Room, string, SearchResult, int) ([]SearchResult, error)
 	PlaySearchResult(context.Context, Room, string, SearchResult) error
@@ -128,13 +131,16 @@ func (b *SonosBackend) Status(ctx context.Context, room Room) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	crossfade, crossfadeErr := transportClient.GetCrossfadeMode(ctx)
 
 	status := Status{
-		State:    strings.TrimSpace(transport.State),
-		Position: strings.TrimSpace(position.RelTime),
-		Duration: strings.TrimSpace(position.TrackDuration),
-		Volume:   volume,
-		Muted:    muted,
+		State:            strings.TrimSpace(transport.State),
+		Position:         strings.TrimSpace(position.RelTime),
+		Duration:         strings.TrimSpace(position.TrackDuration),
+		Volume:           volume,
+		Muted:            muted,
+		CrossfadeEnabled: crossfade,
+		CrossfadeKnown:   crossfadeErr == nil,
 	}
 	if item, ok := sonos.ParseNowPlaying(position.TrackMeta); ok {
 		status.Title = strings.TrimSpace(item.Title)
@@ -177,6 +183,19 @@ func (b *SonosBackend) ToggleMute(ctx context.Context, room Room) error {
 		return err
 	}
 	return c.SetMute(ctx, !muted)
+}
+
+func (b *SonosBackend) ToggleCrossfade(ctx context.Context, room Room) (bool, error) {
+	c := sonos.NewClient(room.transportIP(), b.Timeout)
+	enabled, err := c.GetCrossfadeMode(ctx)
+	if err != nil {
+		return false, err
+	}
+	next := !enabled
+	if err := c.SetCrossfadeMode(ctx, next); err != nil {
+		return false, err
+	}
+	return next, nil
 }
 
 func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, category, query string, limit int) ([]SearchResult, error) {

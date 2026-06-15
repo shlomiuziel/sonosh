@@ -117,6 +117,82 @@ func TestDashboardKeysDispatchActions(t *testing.T) {
 	}
 }
 
+func TestPlaybackConfigModalTogglesCrossfade(t *testing.T) {
+	backend := &fakeBackend{
+		rooms:     []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+		status:    Status{State: "PLAYING", CrossfadeKnown: true, CrossfadeEnabled: false},
+		crossfade: false,
+	}
+	model := NewModel(backend, testConfig())
+	model.rooms = backend.rooms
+	model.status = backend.status
+
+	updated, cmd := model.Update(key("o"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command when opening playback config")
+	}
+	if model.mode != modePlaybackConfig {
+		t.Fatalf("mode = %v, want playback config", model.mode)
+	}
+
+	view := model.View()
+	for _, want := range []string{"PLAYBACK", "Crossfade", "off", "SPACE TOGGLE"} {
+		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
+			t.Fatalf("playback config view missing %q:\n%s", want, view)
+		}
+	}
+
+	updated, cmd = model.Update(key(" "))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected crossfade toggle command")
+	}
+	updated, refreshCmd := model.Update(runCmd(cmd))
+	model = updated.(Model)
+	if !backend.crossfade {
+		t.Fatal("backend crossfade was not toggled")
+	}
+	if !model.status.CrossfadeKnown || !model.status.CrossfadeEnabled {
+		t.Fatalf("model crossfade = known %v enabled %v, want on", model.status.CrossfadeKnown, model.status.CrossfadeEnabled)
+	}
+	if model.message != "crossfade on" {
+		t.Fatalf("message = %q, want crossfade on", model.message)
+	}
+	if refreshCmd == nil {
+		t.Fatal("expected status refresh after crossfade toggle")
+	}
+}
+
+func TestPlaybackConfigModalCloses(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.mode = modePlaybackConfig
+
+	updated, cmd := model.Update(key("esc"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect close command")
+	}
+	if model.mode != modeDashboard {
+		t.Fatalf("mode = %v, want dashboard", model.mode)
+	}
+}
+
+func TestPlaybackConfigRendersUnknownCrossfade(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 110
+	model.mode = modePlaybackConfig
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
+	model.status = Status{State: "PLAYING"}
+
+	view := model.View()
+	for _, want := range []string{"PLAYBACK", "Crossfade", "unknown"} {
+		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
+			t.Fatalf("playback config view missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestThemeShortcutCyclesThemes(t *testing.T) {
 	backend := &fakeBackend{
 		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
@@ -643,6 +719,8 @@ func key(value string) tea.KeyMsg {
 	switch value {
 	case "enter":
 		return tea.KeyMsg{Type: tea.KeyEnter}
+	case "esc":
+		return tea.KeyMsg{Type: tea.KeyEsc}
 	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
 	case "ctrl+p":
@@ -677,6 +755,7 @@ type fakeBackend struct {
 	transportAction  string
 	volume           int
 	muted            bool
+	crossfade        bool
 	played           sonos.SMAPIItem
 	searchQueries    []string
 	searchCategories []string
@@ -703,6 +782,11 @@ func (f *fakeBackend) SetVolume(_ context.Context, _ Room, volume int) error {
 func (f *fakeBackend) ToggleMute(context.Context, Room) error {
 	f.muted = !f.muted
 	return nil
+}
+
+func (f *fakeBackend) ToggleCrossfade(context.Context, Room) (bool, error) {
+	f.crossfade = !f.crossfade
+	return f.crossfade, nil
 }
 
 func (f *fakeBackend) Search(_ context.Context, _ Room, _, category, query string, _ int) ([]SearchResult, error) {
