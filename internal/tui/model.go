@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	refreshEvery         = 5 * time.Second
+	statusRefreshEvery   = 1 * time.Second
+	queueRefreshEvery    = 5 * time.Second
 	spinnerEvery         = 120 * time.Millisecond
 	playlistPreviewLimit = 6
 	queuePageSize        = 50
@@ -65,6 +66,7 @@ type Model struct {
 	queueOffset             int
 	queueLoading            bool
 	queueErr                error
+	queueRefreshAt          time.Time
 	dashboardFocus          dashboardFocus
 	compactLayout           bool
 
@@ -279,6 +281,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case queueMsg:
 		m.queueLoading = false
 		m.queueErr = msg.err
+		m.queueRefreshAt = time.Now()
 		if msg.err == nil {
 			m.queueItems = msg.items
 			m.queueTotal = msg.total
@@ -327,14 +330,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.searchPreviewItems = msg.items
 		return m, nil
 	case tickMsg:
+		now := time.Time(msg)
 		if len(m.rooms) > 0 && !m.loading {
 			cmds := []tea.Cmd{
 				statusCmd(m.backend, m.config.Timeout, m.selectedRoom()),
 				tickCmd(),
 			}
-			if !m.queueLoading {
+			if !m.queueLoading && (m.queueRefreshAt.IsZero() || now.Sub(m.queueRefreshAt) >= queueRefreshEvery) {
 				m.queueLoading = true
 				m.queueErr = nil
+				m.queueRefreshAt = now
 				cmds = append(cmds, queueCmd(m.backend, m.config.Timeout, m.selectedRoom()))
 			}
 			return m, tea.Batch(cmds...)
@@ -1010,7 +1015,7 @@ func helperState(state string) string {
 }
 
 func tickCmd() tea.Cmd {
-	return tea.Tick(refreshEvery, func(t time.Time) tea.Msg {
+	return tea.Tick(statusRefreshEvery, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
