@@ -91,7 +91,7 @@ func TestSpinnerAdvancesOnlyWhileLoading(t *testing.T) {
 func TestDashboardKeysDispatchActions(t *testing.T) {
 	backend := &fakeBackend{
 		rooms:  []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.11"}},
-		status: Status{State: "PLAYING", Volume: 25},
+		status: Status{State: "PLAYING", Volume: 25, Position: "0:01:10", Duration: "0:03:00"},
 	}
 	model := NewModel(backend, testConfig())
 	model.rooms = backend.rooms
@@ -115,6 +115,29 @@ func TestDashboardKeysDispatchActions(t *testing.T) {
 	_ = runCmd(cmd)
 	if backend.volume != 30 {
 		t.Fatalf("volume = %d, want 30", backend.volume)
+	}
+
+	updated, cmd = model.Update(key("right"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected seek command")
+	}
+	_ = runCmd(cmd)
+	if backend.seekDelta != 5 {
+		t.Fatalf("seek delta = %d, want 5", backend.seekDelta)
+	}
+	if backend.seekPosition != "0:01:10" || backend.seekDuration != "0:03:00" {
+		t.Fatalf("seek inputs = %q / %q", backend.seekPosition, backend.seekDuration)
+	}
+
+	updated, cmd = model.Update(key("left"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected seek command")
+	}
+	_ = runCmd(cmd)
+	if backend.seekDelta != -5 {
+		t.Fatalf("seek delta = %d, want -5", backend.seekDelta)
 	}
 }
 
@@ -1067,6 +1090,10 @@ func key(value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEsc}
 	case "tab":
 		return tea.KeyMsg{Type: tea.KeyTab}
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
 	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
 	case "ctrl+l":
@@ -1106,6 +1133,9 @@ type fakeBackend struct {
 	crossfade           bool
 	shuffle             bool
 	repeat              string
+	seekPosition        string
+	seekDuration        string
+	seekDelta           int
 	queuePage           QueuePage
 	playQueuePosition   int
 	removeQueuePosition int
@@ -1160,6 +1190,13 @@ func (f *fakeBackend) ToggleRepeat(context.Context, Room) (string, error) {
 		f.repeat = "all"
 	}
 	return f.repeat, nil
+}
+
+func (f *fakeBackend) Scrub(_ context.Context, _ Room, position, duration string, deltaSeconds int) (string, error) {
+	f.seekPosition = position
+	f.seekDuration = duration
+	f.seekDelta = deltaSeconds
+	return "0:01:05", nil
 }
 
 func (f *fakeBackend) Queue(context.Context, Room, int, int) (QueuePage, error) {

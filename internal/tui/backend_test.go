@@ -61,3 +61,29 @@ func TestRepeatModeFromPlayModeReadsCombinedModes(t *testing.T) {
 		}
 	}
 }
+
+func TestScrubTargetClampsAndOffsets(t *testing.T) {
+	tests := []struct {
+		name     string
+		position string
+		duration string
+		delta    int
+		want     string
+	}{
+		{name: "forward within duration", position: "0:01:10", duration: "0:03:00", delta: 5, want: "0:01:15"},
+		{name: "backward clamps at zero", position: "0:00:03", duration: "0:03:00", delta: -5, want: "0:00:00"},
+		{name: "forward clamps at duration", position: "0:02:58", duration: "0:03:00", delta: 5, want: "0:03:00"},
+		{name: "invalid duration still seeks", position: "0:00:10", duration: "bad", delta: 5, want: "0:00:15"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := scrubTarget(tt.position, tt.duration, tt.delta)
+			if err != nil {
+				t.Fatalf("scrubTarget returned error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("scrubTarget(%q, %q, %d) = %q, want %q", tt.position, tt.duration, tt.delta, got, tt.want)
+			}
+		})
+	}
+}

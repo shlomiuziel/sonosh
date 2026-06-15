@@ -454,6 +454,7 @@ func (m Model) renderTransport(width int) string {
 		keycap("p", "Prev"),
 		keycap("n", "Next"),
 		keycap("s", "Stop"),
+		keycap("left/right", "5s"),
 		keycap("+/-", "Vol"),
 		keycap("m", "Mute"),
 		keycap("o", "Options"),
@@ -901,9 +902,9 @@ func (m Model) renderFooterContent(width int) string {
 	if m.compactLayout {
 		layoutHint = "ctrl+l full"
 	}
-	keys := layoutHint + "  arrows/jk move  enter play  o options  / search"
+	keys := layoutHint + "  left/right 5s  arrows/jk move  enter play  o options  / search"
 	if m.compactLayout {
-		keys = layoutHint + "  o options  / search"
+		keys = layoutHint + "  left/right 5s  o options  / search"
 	}
 	if m.mode == modeSearch {
 		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
@@ -972,6 +973,15 @@ func footerKeys(value string, width int) string {
 		choices = append(choices,
 			"enter play  x remove  [] move  esc",
 			"enter  x  []  esc",
+		)
+	case "left/right 5s  arrows/jk move  enter play  o options  / search":
+		choices = append(choices,
+			"left/right 5s  enter play  o options  / search",
+			"left/right 5s  o options  / search",
+		)
+	case "left/right 5s  o options  / search":
+		choices = append(choices,
+			"left/right 5s  o options",
 		)
 	default:
 		choices = append(choices,

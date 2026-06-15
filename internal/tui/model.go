@@ -136,6 +136,11 @@ type queueActionMsg struct {
 	err     error
 }
 
+type seekMsg struct {
+	message string
+	err     error
+}
+
 type searchMsg struct {
 	query      string
 	category   string
@@ -342,6 +347,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case seekMsg:
+		m.loading = false
+		m.err = msg.err
+		if msg.err == nil {
+			m.message = msg.message
+			if len(m.rooms) > 0 {
+				m.loading = true
+				return m, statusCmd(m.backend, m.config.Timeout, m.selectedRoom())
+			}
+		}
+		return m, nil
 	case searchMsg:
 		m.loading = false
 		m.err = msg.err
@@ -526,6 +542,12 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "p":
 		m.loading = true
 		return m, tea.Batch(transportCmd(m.backend, m.config.Timeout, m.selectedRoom(), "previous"), spinnerCmd())
+	case "left":
+		m.loading = true
+		return m, tea.Batch(seekCmd(m.backend, m.config.Timeout, m.selectedRoom(), m.status.Position, m.status.Duration, -5), spinnerCmd())
+	case "right":
+		m.loading = true
+		return m, tea.Batch(seekCmd(m.backend, m.config.Timeout, m.selectedRoom(), m.status.Position, m.status.Duration, 5), spinnerCmd())
 	case "+", "=":
 		m.loading = true
 		return m, tea.Batch(volumeCmd(m.backend, m.config.Timeout, m.selectedRoom(), m.status.Volume+5), spinnerCmd())
@@ -969,6 +991,22 @@ func queueMoveCmd(backend Backend, timeout time.Duration, room Room, fromPositio
 		defer cancel()
 		err := backend.MoveQueuePosition(ctx, room, fromPosition, toPosition)
 		return queueActionMsg{message: fmt.Sprintf("moved queue %d to %d", fromPosition, toPosition), err: err}
+	}
+}
+
+func seekCmd(backend Backend, timeout time.Duration, room Room, position, duration string, deltaSeconds int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		target, err := backend.Scrub(ctx, room, position, duration, deltaSeconds)
+		if err != nil {
+			return seekMsg{message: "seek failed", err: err}
+		}
+		suffix := "+"
+		if deltaSeconds < 0 {
+			suffix = ""
+		}
+		return seekMsg{message: fmt.Sprintf("seek %s%ds -> %s", suffix, deltaSeconds, target), err: nil}
 	}
 }
 

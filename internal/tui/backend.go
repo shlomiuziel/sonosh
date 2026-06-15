@@ -76,6 +76,7 @@ type Backend interface {
 	ToggleCrossfade(context.Context, Room) (bool, error)
 	ToggleShuffle(context.Context, Room) (bool, error)
 	ToggleRepeat(context.Context, Room) (string, error)
+	Scrub(context.Context, Room, string, string, int) (string, error)
 	Queue(context.Context, Room, int, int) (QueuePage, error)
 	PlayQueuePosition(context.Context, Room, int) error
 	RemoveQueuePosition(context.Context, Room, int) error
@@ -264,6 +265,17 @@ func (b *SonosBackend) ToggleRepeat(ctx context.Context, room Room) (string, err
 	return nextRepeat, nil
 }
 
+func (b *SonosBackend) Scrub(ctx context.Context, room Room, position, duration string, deltaSeconds int) (string, error) {
+	target, err := scrubTarget(position, duration, deltaSeconds)
+	if err != nil {
+		return "", err
+	}
+	if err := sonos.NewClient(room.transportIP(), b.Timeout).SeekRelTime(ctx, target); err != nil {
+		return "", err
+	}
+	return target, nil
+}
+
 func (b *SonosBackend) Queue(ctx context.Context, room Room, start, count int) (QueuePage, error) {
 	page, err := sonos.NewClient(room.transportIP(), b.Timeout).ListQueue(ctx, start, count)
 	if err != nil {
@@ -381,6 +393,52 @@ func setRepeatPlayMode(mode, repeat string) string {
 		}
 		return "NORMAL"
 	}
+}
+
+func scrubTarget(position, duration string, deltaSeconds int) (string, error) {
+	cur, err := parseTimecode(position)
+	if err != nil {
+		return "", err
+	}
+	total, err := parseTimecode(duration)
+	if err != nil {
+		total = 0
+	}
+	next := cur + time.Duration(deltaSeconds)*time.Second
+	if next < 0 {
+		next = 0
+	}
+	if total > 0 && next > total {
+		next = total
+	}
+	return formatTimecode(next), nil
+}
+
+func parseTimecode(value string) (time.Duration, error) {
+	parts := strings.Split(strings.TrimSpace(value), ":")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("invalid timecode %q", value)
+	}
+	var values [3]int
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("invalid timecode %q", value)
+		}
+		values[i] = n
+	}
+	return time.Duration(values[0])*time.Hour + time.Duration(values[1])*time.Minute + time.Duration(values[2])*time.Second, nil
+}
+
+func formatTimecode(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	totalSeconds := int(d.Round(time.Second) / time.Second)
+	hours := totalSeconds / 3600
+	minutes := (totalSeconds % 3600) / 60
+	seconds := totalSeconds % 60
+	return fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
 }
 
 func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, category, query string, limit int) ([]SearchResult, error) {
