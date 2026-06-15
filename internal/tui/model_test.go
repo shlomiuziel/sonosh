@@ -605,6 +605,20 @@ func TestWideFooterStartsUnderRightPane(t *testing.T) {
 	}
 }
 
+func TestWideFooterCentersInRightPane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	footer := model.renderFooterRow(108)
+	rightWidth := 108 - sidebarWidth - paneGapWidth
+	right := footer[sidebarWidth+paneGapWidth:]
+	if got := lipgloss.Width(right); got != rightWidth {
+		t.Fatalf("right footer width = %d, want %d:\n%s", got, rightWidth, footer)
+	}
+	if strings.HasPrefix(right, " ") {
+		return
+	}
+	t.Fatalf("footer was not centered in right pane:\n%q", right)
+}
+
 func TestWideBodyKeepsPaneWidthsAligned(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}

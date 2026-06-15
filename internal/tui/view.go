@@ -412,7 +412,7 @@ func (m Model) renderPlaylistPreview(width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m Model) renderFooter(width int) string {
+func (m Model) renderFooterContent(width int) string {
 	var status string
 	if m.err != nil {
 		status = errorStyle.Render("Error: " + displayText(m.err.Error(), max(10, width-8)))
@@ -446,7 +446,11 @@ func (m Model) renderFooter(width int) string {
 	if theme != "" && width-lipgloss.Width(status)-lipgloss.Width(keys)-4 > themeWidth {
 		segments = append(segments, "  ", theme, " ", themeHint)
 	}
-	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(lipgloss.JoinHorizontal(lipgloss.Top, segments...))
+	return lipgloss.JoinHorizontal(lipgloss.Top, segments...)
+}
+
+func (m Model) renderFooter(width int) string {
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Render(m.renderFooterContent(width))
 }
 
 func (m Model) renderFooterRow(width int) string {
@@ -457,7 +461,8 @@ func (m Model) renderFooterRow(width int) string {
 	gutter := lipgloss.NewStyle().
 		Width(sidebarWidth + paneGapWidth).
 		Render("")
-	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, m.renderFooter(rightWidth))
+	footer := m.renderFooterContent(rightWidth)
+	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, lipgloss.PlaceHorizontal(rightWidth, lipgloss.Center, footer))
 }
 
 func footerKeys(value string, width int) string {
