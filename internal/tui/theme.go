@@ -107,6 +107,7 @@ var (
 	accentStyle   lipgloss.Style
 	selectedStyle lipgloss.Style
 	coverStyle    lipgloss.Style
+	trackStyle    lipgloss.Style
 	hintStyle     lipgloss.Style
 	errorStyle    lipgloss.Style
 	messageStyle  lipgloss.Style
@@ -141,13 +142,11 @@ func applyTheme(name string) string {
 	colorSelected = theme.Selected
 
 	baseStyle = lipgloss.NewStyle().
-		Foreground(colorInk).
-		Background(theme.Base)
+		Foreground(colorInk)
 
 	panelStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorSubtle).
-		Background(colorPanel).
 		Padding(0, 2)
 
 	sidebarStyle = panelStyle.Copy().
@@ -170,8 +169,7 @@ func applyTheme(name string) string {
 		Bold(true)
 
 	selectedStyle = lipgloss.NewStyle().
-		Foreground(colorInk).
-		Background(colorPanelHi).
+		Foreground(colorSelected).
 		Bold(true).
 		Padding(0, 1)
 
@@ -179,8 +177,11 @@ func applyTheme(name string) string {
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(colorAccent2).
 		Foreground(colorInk).
-		Background(theme.Cover).
 		Padding(0, 2)
+
+	trackStyle = lipgloss.NewStyle().
+		Foreground(colorInk).
+		Padding(1, 2)
 
 	hintStyle = lipgloss.NewStyle().
 		Foreground(colorMuted)

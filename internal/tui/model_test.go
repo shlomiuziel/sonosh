@@ -510,6 +510,7 @@ func TestViewRendersPlayerSurface(t *testing.T) {
 		"Laundry Service",
 		"▀▀▀▀",
 		"42%",
+		"▸",
 	} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
@@ -564,6 +565,7 @@ func TestViewRendersSearchSurface(t *testing.T) {
 		"results for mas que nada",
 		"Mas Que Nada",
 		"ENTER PLAY  CTRL+T TRACKS  CTRL+P PLAYLISTS  ESC CLOSE",
+		"▸",
 	} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("search view missing %q:\n%s", want, view)
@@ -594,12 +596,24 @@ func TestFooterFitsNarrowWidth(t *testing.T) {
 func TestWideFooterStartsUnderRightPane(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 	footer := model.renderFooterRow(108)
-	gutter := strings.Repeat(" ", sidebarWidth+1)
+	gutter := strings.Repeat(" ", sidebarWidth+paneGapWidth)
 	if !strings.HasPrefix(footer, gutter) {
 		t.Fatalf("footer did not start after sidebar gutter:\n%q", footer)
 	}
 	if got := lipgloss.Width(footer); got > 108 {
 		t.Fatalf("footer width = %d, want <= 108:\n%s", got, footer)
+	}
+}
+
+func TestWideBodyKeepsPaneWidthsAligned(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.rooms = []Room{{Name: "Living Room", IP: "192.0.2.10"}}
+	body := model.renderBody(108)
+	if got := lipgloss.Width(body); got != 108 {
+		t.Fatalf("body width = %d, want 108:\n%s", got, body)
+	}
+	if got := lipgloss.Width(model.renderRooms(sidebarWidth)); got != sidebarWidth {
+		t.Fatalf("rooms pane width = %d, want %d", got, sidebarWidth)
 	}
 }
 

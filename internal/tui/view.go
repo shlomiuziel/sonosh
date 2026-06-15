@@ -11,6 +11,7 @@ import (
 const (
 	minWidth       = 72
 	sidebarWidth   = 28
+	paneGapWidth   = 1
 	compactAtWidth = 92
 	borderChrome   = 2
 )
@@ -58,10 +59,10 @@ func (m Model) renderBody(width int) string {
 	}
 
 	left := m.renderRooms(sidebarWidth)
-	rightWidth := width - sidebarWidth - 1
+	rightWidth := width - sidebarWidth - paneGapWidth
 	right := m.renderRightPane(rightWidth)
 	separatorHeight := max(lipgloss.Height(left), lipgloss.Height(right))
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneSeparator(separatorHeight), right)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, paneGap(separatorHeight), right)
 }
 
 func (m Model) renderHeader(width int) string {
@@ -105,19 +106,18 @@ func (m Model) renderRooms(width int) string {
 	}
 
 	for i, room := range m.rooms {
-		nameWidth := max(8, contentWidth-4)
+		nameWidth := max(8, contentWidth-5)
 		name := displayText(room.Name, nameWidth)
 		members := displayText(strings.Join(room.GroupMembers, ", "), nameWidth)
 		if members == "" {
 			members = room.IP
 		}
-		row := fmt.Sprintf("%s\n%s", titleStyle.Render(name), subtitleStyle.Render(members))
 		if i == m.roomIndex {
-			row = selectedStyle.Width(max(1, contentWidth-4)).Render(row)
+			lines = append(lines, selectedRoomRow(name, members, max(1, contentWidth-sidebarStyle.GetHorizontalPadding())))
 		} else {
-			row = lipgloss.NewStyle().Padding(0, 1).Render(row)
+			row := fmt.Sprintf("%s\n%s", titleStyle.Render(name), subtitleStyle.Render(members))
+			lines = append(lines, lipgloss.NewStyle().Padding(0, 1).Render(row))
 		}
-		lines = append(lines, row)
 	}
 
 	return sidebarStyle.Width(contentWidth).Render(strings.Join(lines, "\n"))
@@ -234,17 +234,18 @@ func centerLine(width int, value string) string {
 }
 
 func (m Model) renderTrackDetails(width int) string {
+	contentWidth := max(1, width-trackStyle.GetHorizontalPadding())
 	progressLabel := fmt.Sprintf("%s / %s", empty(m.status.Position, "--:--"), empty(m.status.Duration, "--:--"))
-	progress := renderBar(progressRatio(m.status.Position, m.status.Duration), max(8, width-lipgloss.Width(progressLabel)-3), colorAccent)
+	progress := renderBar(progressRatio(m.status.Position, m.status.Duration), max(8, contentWidth-lipgloss.Width(progressLabel)-3), colorAccent)
 	volumeLabel := fmt.Sprintf("%3d%%  %s", clamp(m.status.Volume, 0, 100), muteLabel(m.status.Muted))
-	volume := renderBar(float64(clamp(m.status.Volume, 0, 100))/100, max(8, width-lipgloss.Width(volumeLabel)-3), colorAccent2)
+	volume := renderBar(float64(clamp(m.status.Volume, 0, 100))/100, max(8, contentWidth-lipgloss.Width(volumeLabel)-3), colorAccent2)
 
 	title := titleStyle.
 		Foreground(colorInk).
 		Bold(true).
-		Render(displayText(empty(m.status.Title, "Nothing playing"), width))
-	artist := subtitleStyle.Render(displayText(empty(m.status.Artist, "Unknown artist"), width))
-	album := subtitleStyle.Render(displayText(empty(m.status.Album, "Unknown album"), width))
+		Render(displayText(empty(m.status.Title, "Nothing playing"), contentWidth))
+	artist := subtitleStyle.Render(displayText(empty(m.status.Artist, "Unknown artist"), contentWidth))
+	album := subtitleStyle.Render(displayText(empty(m.status.Album, "Unknown album"), contentWidth))
 
 	rows := []string{
 		labelStyle.Render("Track"),
@@ -255,9 +256,9 @@ func (m Model) renderTrackDetails(width int) string {
 		fmt.Sprintf("%s  %s", progress, progressLabel),
 		fmt.Sprintf("%s  %s", volume, volumeLabel),
 		"",
-		m.renderTransport(width),
+		m.renderTransport(contentWidth),
 	}
-	return lipgloss.NewStyle().Width(width).Render(strings.Join(rows, "\n"))
+	return trackStyle.Width(width).Render(strings.Join(rows, "\n"))
 }
 
 func (m Model) renderTransport(width int) string {
@@ -292,7 +293,6 @@ func (m Model) renderSearchSpotlight(width int) string {
 	modal := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorSelected).
-		Background(colorPanelHi).
 		Padding(1, 2).
 		Width(modalWidth).
 		Render(content)
@@ -330,7 +330,7 @@ func (m Model) renderSearchContent(width int) string {
 			item := m.searchItems[i]
 			row := fmt.Sprintf("%2d  %-9s  %s", i+1, truncate(item.Item.ItemType, 9), displayText(item.Title(), max(8, contentWidth-18)))
 			if i == m.searchIndex {
-				row = selectedStyle.Width(max(1, contentWidth-4)).Render(row)
+				row = selectedLine(row, max(1, contentWidth-4))
 			} else {
 				row = lipgloss.NewStyle().PaddingLeft(1).Render(row)
 			}
@@ -364,11 +364,26 @@ func renderSearchField(query string, width int) string {
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorSelected).
-		Background(colorPanelHi).
 		Foreground(colorInk).
 		Width(max(16, width-4)).
 		Render("> " + display)
 	return field
+}
+
+func selectedLine(value string, width int) string {
+	marker := accentStyle.Render("▸")
+	contentWidth := max(1, width-lipgloss.Width("▸"))
+	textWidth := max(1, contentWidth-selectedStyle.GetHorizontalPadding())
+	content := selectedStyle.Width(contentWidth).Render(displayText(value, textWidth))
+	return lipgloss.NewStyle().Width(width).Render(marker + content)
+}
+
+func selectedRoomRow(name, members string, width int) string {
+	contentWidth := max(1, width-lipgloss.Width("▸"))
+	textWidth := max(1, contentWidth-selectedStyle.GetHorizontalPadding())
+	nameLine := accentStyle.Render("▸") + selectedStyle.Width(contentWidth).Render(displayText(name, textWidth))
+	memberLine := " " + subtitleStyle.Foreground(colorSelected).Bold(true).Render(displayText(members, contentWidth))
+	return lipgloss.NewStyle().Width(width).Render(nameLine + "\n" + memberLine)
 }
 
 func (m Model) renderPlaylistPreview(width int) string {
@@ -438,9 +453,9 @@ func (m Model) renderFooterRow(width int) string {
 	if width < compactAtWidth {
 		return m.renderFooter(width)
 	}
-	rightWidth := max(1, width-sidebarWidth-1)
+	rightWidth := max(1, width-sidebarWidth-paneGapWidth)
 	gutter := lipgloss.NewStyle().
-		Width(sidebarWidth + 1).
+		Width(sidebarWidth + paneGapWidth).
 		Render("")
 	return lipgloss.JoinHorizontal(lipgloss.Top, gutter, m.renderFooter(rightWidth))
 }
@@ -470,13 +485,11 @@ func footerKeys(value string, width int) string {
 	return ""
 }
 
-func paneSeparator(height int) string {
+func paneGap(height int) string {
 	return lipgloss.NewStyle().
-		Foreground(colorSubtle).
-		Background(colorPanel).
-		Width(1).
+		Width(paneGapWidth).
 		Height(max(1, height)).
-		Render("│")
+		Render("")
 }
 
 func statusPill(state string) string {
@@ -488,7 +501,11 @@ func statusPill(state string) string {
 	case "paused", "paused playback":
 		return style.Background(colorWarn).Render(state)
 	default:
-		return style.Background(colorSubtle).Foreground(colorInk).Render(state)
+		return lipgloss.NewStyle().
+			Padding(0, 1).
+			Bold(true).
+			Foreground(colorMuted).
+			Render(state)
 	}
 }
 
