@@ -38,13 +38,16 @@ func (m Model) renderApp() string {
 	viewModel := m
 	if m.mode == modeSearch || m.mode == modePlaybackConfig {
 		viewModel.mode = modeDashboard
-		if strings.Contains(viewModel.artView, "\x1b_G") && !strings.Contains(viewModel.artView, "z=-") {
-			viewModel.artView = viewModel.artFallbackView
-		}
 	}
 	view := viewModel.renderAppContent(contentWidth)
 	rendered := baseStyle.Width(width).Height(height).Render(view)
-	if overlay := m.renderOverlay(height, contentWidth); overlay.content != "" {
+	overlay := m.renderOverlay(height, contentWidth)
+	if overlay.content != "" && kittyArtIntersectsOverlay(rendered, overlay) {
+		viewModel.artView = viewModel.artFallbackView
+		view = viewModel.renderAppContent(contentWidth)
+		rendered = baseStyle.Width(width).Height(height).Render(view)
+	}
+	if overlay.content != "" {
 		rendered = overlayFrame(rendered, overlay.x, overlay.y, overlay.content)
 	}
 	if supportsKittyGraphics() {
@@ -646,6 +649,96 @@ func (m Model) renderModalOverlay(paneX, paneWidth, height int, modal string) ov
 	x := paneX + max(0, (paneWidth-modalWidth)/2)
 	y := max(1, (height-modalHeight)/2+1)
 	return overlayContent{x: x, y: y, content: modal}
+}
+
+type viewRect struct {
+	x      int
+	y      int
+	width  int
+	height int
+}
+
+func kittyArtIntersectsOverlay(rendered string, overlay overlayContent) bool {
+	if overlay.content == "" {
+		return false
+	}
+	art, ok := kittyArtBounds(rendered)
+	if !ok {
+		return false
+	}
+	modal := viewRect{
+		x:      overlay.x,
+		y:      overlay.y,
+		width:  lipgloss.Width(overlay.content),
+		height: lipgloss.Height(overlay.content),
+	}
+	return rectsIntersect(art, modal)
+}
+
+func kittyArtBounds(rendered string) (viewRect, bool) {
+	lines := strings.Split(rendered, "\n")
+	for y, line := range lines {
+		width := 0
+		for i := 0; i < len(line); {
+			if line[i] == '\x1b' {
+				seq, next, _ := scanANSISequence(line, i)
+				if next <= i {
+					i++
+					continue
+				}
+				if strings.HasPrefix(seq, "\x1b_G") {
+					cols, rows := kittyImageDimensions(seq)
+					return viewRect{x: width + 1, y: y + 1, width: cols, height: rows}, true
+				}
+				i = next
+				continue
+			}
+			r, size := utf8.DecodeRuneInString(line[i:])
+			if r == utf8.RuneError && size == 0 {
+				break
+			}
+			value := line[i : i+size]
+			width += lipgloss.Width(value)
+			i += size
+		}
+	}
+	return viewRect{}, false
+}
+
+func kittyImageDimensions(seq string) (int, int) {
+	cols := albumArtColumns
+	rows := albumArtRows
+	params := strings.TrimPrefix(seq, "\x1b_G")
+	if beforePayload, _, ok := strings.Cut(params, ";"); ok {
+		params = beforePayload
+	}
+	for _, param := range strings.Split(params, ",") {
+		key, value, ok := strings.Cut(param, "=")
+		if !ok {
+			continue
+		}
+		size, err := strconv.Atoi(value)
+		if err != nil || size <= 0 {
+			continue
+		}
+		switch key {
+		case "c":
+			cols = size
+		case "r":
+			rows = size
+		}
+	}
+	return cols, rows
+}
+
+func rectsIntersect(a, b viewRect) bool {
+	if a.width <= 0 || a.height <= 0 || b.width <= 0 || b.height <= 0 {
+		return false
+	}
+	return a.x < b.x+b.width &&
+		a.x+a.width > b.x &&
+		a.y < b.y+b.height &&
+		a.y+a.height > b.y
 }
 
 func overlayFrame(base string, x, y int, content string) string {

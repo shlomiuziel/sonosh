@@ -303,13 +303,19 @@ func TestPlaybackConfigRendersUnknownCrossfade(t *testing.T) {
 	model.width = 110
 	model.mode = modePlaybackConfig
 	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
-	model.status = Status{State: "PLAYING"}
+	model.status = Status{State: "PLAYING", AlbumArt: "http://example.test/art.jpg"}
+	model.artURL = model.status.AlbumArt
+	model.artView = "\x1b_Ga=T,C=1,f=100,c=16,r=8,z=-1;AAAA\x1b\\"
+	model.artFallbackView = "▀▀▀▀\n▀▀▀▀"
 
 	view := model.View()
 	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "unknown"} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("playback config view missing %q:\n%s", want, view)
 		}
+	}
+	if strings.Contains(view, "\x1b_Ga=T") {
+		t.Fatalf("playback config should use block album art while the modal is active:\n%s", view)
 	}
 }
 
@@ -775,14 +781,37 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	if !strings.HasPrefix(view, clearKittyGraphics()) {
 		t.Fatalf("search surface should clear terminal graphics before drawing modal:\n%s", view)
 	}
-	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "z=-1") {
-		t.Fatalf("search surface should redraw kitty album art as an underlay behind the modal:\n%s", view)
+	if strings.Contains(view, "\x1b_Ga=T") {
+		t.Fatalf("search surface should use block album art while the modal is active:\n%s", view)
 	}
 	if strings.Contains(view, "\x1b[s") || strings.Contains(view, "\x1b[u") {
 		t.Fatalf("search surface should not use cursor-position overlays:\n%s", view)
 	}
 	if !strings.Contains(view, "Kitchen") || !strings.Contains(view, "Current Track") {
 		t.Fatalf("search surface should keep the dashboard rendered behind the modal:\n%s", view)
+	}
+}
+
+func TestViewKeepsKittyArtWhenSearchSurfaceDoesNotOverlapCover(t *testing.T) {
+	t.Setenv("TERM_PROGRAM", "Ghostty")
+
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.width = 110
+	model.height = 60
+	model.loading = false
+	model.mode = modeSearch
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}}
+	model.status = Status{State: "PAUSED_PLAYBACK", Title: "Current Track", Artist: "Artist", AlbumArt: "http://example.test/art.jpg"}
+	model.artURL = model.status.AlbumArt
+	model.artView = "\x1b_Ga=T,C=1,f=100,c=16,r=8,z=-1;AAAA\x1b\\"
+	model.artFallbackView = "▀▀▀▀\n▀▀▀▀"
+
+	view := model.View()
+	if !strings.Contains(strings.ToUpper(view), "SPOTIFY / TRACKS") {
+		t.Fatalf("search modal missing expected label:\n%s", view)
+	}
+	if !strings.Contains(view, "\x1b_Ga=T") || !strings.Contains(view, "z=-1") {
+		t.Fatalf("search surface should keep high-quality album art when the modal does not overlap it:\n%s", view)
 	}
 }
 
