@@ -17,6 +17,7 @@ const (
 	queueRefreshEvery    = 5 * time.Second
 	spinnerEvery         = 120 * time.Millisecond
 	playlistPreviewLimit = 6
+	playlistShelfLimit   = 6
 	queuePageSize        = 50
 )
 
@@ -30,6 +31,7 @@ type Config struct {
 	ThemeConfigPath  string
 	Compact          bool
 	LayoutConfigPath string
+	CarouselPath     string
 }
 
 type Model struct {
@@ -57,11 +59,22 @@ type Model struct {
 	searchGeneration        int
 	searchItems             []SearchResult
 	searchIndex             int
+	searchOffset            int
+	searchFocus             searchFocus
 	themeName               string
 	searchPreviewItemID     string
 	searchPreviewLoading    bool
 	searchPreviewGeneration int
 	searchPreviewItems      []SearchResult
+	carouselStore           playlistCarouselStore
+	carouselLoading         bool
+	carouselGeneration      int
+	carouselPinned          []SearchResult
+	carouselRecent          []SearchResult
+	carouselMadeForYou      []SearchResult
+	carouselTab             int
+	carouselIndex           int
+	carouselThumbViews      map[string]string
 	queueItems              []QueueItem
 	queueTotal              int
 	queueIndex              int
@@ -79,6 +92,7 @@ type Model struct {
 
 type mode int
 type dashboardFocus int
+type searchFocus int
 
 const (
 	modeDashboard mode = iota
@@ -89,6 +103,11 @@ const (
 const (
 	focusMain dashboardFocus = iota
 	focusQueue
+)
+
+const (
+	searchFocusResults searchFocus = iota
+	searchFocusCarousel
 )
 
 type roomsMsg struct {
@@ -109,8 +128,10 @@ type albumArtMsg struct {
 }
 
 type actionMsg struct {
-	message string
-	err     error
+	message        string
+	err            error
+	playlistPlayed bool
+	playedPlaylist SearchResult
 }
 
 type crossfadeMsg struct {
@@ -159,6 +180,21 @@ type playlistPreviewMsg struct {
 	err        error
 }
 
+type playlistCarouselMsg struct {
+	generation int
+	store      playlistCarouselStore
+	pinned     []SearchResult
+	recent     []SearchResult
+	madeForYou []SearchResult
+	err        error
+}
+
+type playlistThumbMsg struct {
+	url  string
+	view string
+	err  error
+}
+
 type tickMsg time.Time
 
 type spinnerMsg time.Time
@@ -189,6 +225,10 @@ func NewModel(backend Backend, cfg Config) Model {
 		cfg.SearchLimit = 10
 	}
 	themeName := applyTheme(cfg.Theme)
+	carouselStore, err := LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		carouselStore = defaultPlaylistCarouselStore()
+	}
 	return Model{
 		backend:        backend,
 		config:         cfg,
@@ -198,6 +238,9 @@ func NewModel(backend Backend, cfg Config) Model {
 		searchCategory: cfg.SearchCategory,
 		themeName:      themeName,
 		compactLayout:  cfg.Compact,
+		carouselStore:  carouselStore,
+		carouselPinned: playlistCarouselPinnedResults(carouselStore),
+		carouselRecent: playlistCarouselRecentResults(carouselStore),
 	}
 }
 
@@ -285,6 +328,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.err = msg.err
 		if msg.err == nil {
+			if msg.playlistPlayed {
+				m.recordRecentPlaylist(msg.playedPlaylist)
+			}
 			m.message = msg.message
 			if len(m.rooms) > 0 {
 				m.loading = true
@@ -376,6 +422,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchPreviewQuery = msg.query
 			m.searchItems = msg.items
 			m.searchIndex = 0
+			m.searchOffset = 0
+			m.searchFocus = searchFocusResults
 			m.message = fmt.Sprintf("%d search results", len(msg.items))
 			m.resetPlaylistPreview()
 			updated, cmd := m.previewSelectedSearchResult()
@@ -392,6 +440,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.searchPreviewItems = msg.items
+		return m, nil
+	case playlistCarouselMsg:
+		if msg.generation != m.carouselGeneration {
+			return m, nil
+		}
+		var cmds []tea.Cmd
+		m.carouselLoading = false
+		m.carouselStore = normalizePlaylistCarouselStore(msg.store)
+		m.carouselPinned = msg.pinned
+		m.carouselRecent = msg.recent
+		m.carouselMadeForYou = msg.madeForYou
+		m.clampCarouselSelection()
+		cmds = append(cmds, m.playlistThumbCmds()...)
+		if err := SavePlaylistCarouselStore(m.config.CarouselPath, m.carouselStore); err != nil {
+			m.message = "playlist carousel save failed: " + err.Error()
+		} else if msg.err != nil {
+			m.message = "playlist carousel unavailable: " + msg.err.Error()
+		}
+		if m.mode == modeSearch && m.playlistCarouselVisible() && strings.TrimSpace(m.searchQuery) == "" {
+			m.searchFocus = searchFocusCarousel
+			updated, cmd := m.previewSelectedCarouselResult()
+			m = updated.(Model)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
+	case playlistThumbMsg:
+		if msg.err != nil || strings.TrimSpace(msg.url) == "" || msg.view == "" {
+			return m, nil
+		}
+		if m.carouselThumbViews == nil {
+			m.carouselThumbViews = map[string]string{}
+		}
+		m.carouselThumbViews[msg.url] = msg.view
 		return m, nil
 	case tickMsg:
 		now := time.Time(msg)
@@ -484,7 +567,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.mode = modeSearch
 		m.err = nil
-		return m, tea.ClearScreen
+		return m.openSearch()
 	case "o":
 		m.mode = modePlaybackConfig
 		m.playbackConfigIndex = 0
@@ -675,32 +758,75 @@ func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
+		if m.playlistCarouselVisible() && m.searchFocus == searchFocusResults && m.searchIndex == 0 && m.hasCarouselItems() {
+			m.searchFocus = searchFocusCarousel
+			updated, cmd := m.previewSelectedCarouselResult()
+			return updated, cmd
+		}
+		if m.searchFocus == searchFocusCarousel {
+			return m, nil
+		}
 		if m.searchIndex > 0 {
 			m.searchIndex--
+			m.ensureSearchSelectionVisible()
 		}
 		updated, cmd := m.previewSelectedSearchResult()
 		return updated, cmd
 	case "down", "j":
+		if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+			if len(m.searchItems) > 0 {
+				m.searchFocus = searchFocusResults
+				updated, cmd := m.previewSelectedSearchResult()
+				return updated, cmd
+			}
+			return m, nil
+		}
 		if m.searchIndex < len(m.searchItems)-1 {
 			m.searchIndex++
+			m.ensureSearchSelectionVisible()
 		}
 		updated, cmd := m.previewSelectedSearchResult()
 		return updated, cmd
+	case "left", "right":
+		if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+			m.moveCarouselSelection(msg.String())
+			updated, cmd := m.previewSelectedCarouselResult()
+			return updated, cmd
+		}
+		return m, nil
 	case "backspace", "ctrl+h":
 		m.searchQuery = trimLastRune(m.searchQuery)
 		m.searchIndex = 0
+		m.searchOffset = 0
 		m.searchGeneration++
-		m.loading = true
+		m.searchFocus = searchFocusResults
 		m.resetPlaylistPreview()
+		if strings.TrimSpace(m.searchQuery) == "" {
+			m.searchPreviewQuery = ""
+			m.searchItems = nil
+			if m.playlistCarouselVisible() {
+				m.searchFocus = searchFocusCarousel
+				updated, cmd := m.previewSelectedCarouselResult()
+				return updated, cmd
+			}
+			return m, nil
+		}
+		m.loading = true
 		return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
 	case "ctrl+u":
 		m.searchQuery = ""
 		m.searchIndex = 0
+		m.searchOffset = 0
 		m.searchGeneration++
 		m.loading = false
 		m.searchPreviewQuery = ""
 		m.searchItems = nil
 		m.resetPlaylistPreview()
+		if m.playlistCarouselVisible() {
+			m.searchFocus = searchFocusCarousel
+			updated, cmd := m.previewSelectedCarouselResult()
+			return updated, cmd
+		}
 		return m, nil
 	case "tab", "esc":
 		m.mode = modeDashboard
@@ -710,9 +836,29 @@ func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.setSearchCategory("tracks")
 	case "ctrl+p":
 		return m.setSearchCategory("playlists")
+	case "ctrl+f":
+		if toggled, ok := m.toggleSelectedPlaylistPin(); ok {
+			if toggled {
+				return m.finishPlaylistPinToggle()
+			}
+			return m, nil
+		}
+		return m, nil
 	case "enter":
 		if len(m.rooms) == 0 {
 			return m, nil
+		}
+		if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+			result, ok := m.selectedCarouselResult()
+			if !ok {
+				return m, nil
+			}
+			if strings.TrimSpace(result.Item.ID) == "" {
+				m.message = "playlist not resolved yet"
+				return m, nil
+			}
+			m.loading = true
+			return m, tea.Batch(playSearchCmd(m.backend, m.config, m.selectedRoom(), result), spinnerCmd())
 		}
 		if len(m.searchItems) > 0 && m.searchPreviewQuery == m.searchQuery {
 			m.loading = true
@@ -724,10 +870,29 @@ func (m Model) updateSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
 		}
 		return m, nil
+	case " ":
+		if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+			if toggled, ok := m.toggleSelectedPlaylistPin(); ok {
+				if toggled {
+					return m.finishPlaylistPinToggle()
+				}
+				return m, nil
+			}
+		}
+		m.searchQuery += msg.String()
+		m.searchIndex = 0
+		m.searchOffset = 0
+		m.searchFocus = searchFocusResults
+		m.searchGeneration++
+		m.loading = true
+		m.resetPlaylistPreview()
+		return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
 	default:
 		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
 			m.searchQuery += msg.String()
 			m.searchIndex = 0
+			m.searchOffset = 0
+			m.searchFocus = searchFocusResults
 			m.searchGeneration++
 			m.loading = true
 			m.resetPlaylistPreview()
@@ -743,17 +908,38 @@ func (m Model) setSearchCategory(category string) (tea.Model, tea.Cmd) {
 	}
 	m.searchCategory = category
 	m.searchIndex = 0
+	m.searchOffset = 0
+	m.searchFocus = searchFocusResults
 	m.searchPreviewQuery = ""
 	m.searchItems = nil
 	m.resetPlaylistPreview()
 	m.message = "searching " + category
 	m.err = nil
 	m.searchGeneration++
+	var cmds []tea.Cmd
 	if strings.TrimSpace(m.searchQuery) == "" || len(m.rooms) == 0 {
-		return m, nil
+		if m.playlistCarouselVisible() {
+			m.searchFocus = searchFocusCarousel
+			if len(m.rooms) > 0 {
+				m.startPlaylistCarouselLoad()
+				cmds = append(cmds, playlistCarouselCmd(m.backend, m.config, m.selectedRoom(), m.carouselStore, m.carouselGeneration))
+			}
+			updated, cmd := m.previewSelectedCarouselResult()
+			m = updated.(Model)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
 	}
 	m.loading = true
-	return m, tea.Batch(searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration), spinnerCmd())
+	cmds = append(cmds, searchCmd(m.backend, m.config, m.selectedRoom(), m.searchCategory, m.searchQuery, m.searchGeneration))
+	if m.playlistCarouselVisible() {
+		m.startPlaylistCarouselLoad()
+		cmds = append(cmds, playlistCarouselCmd(m.backend, m.config, m.selectedRoom(), m.carouselStore, m.carouselGeneration))
+	}
+	cmds = append(cmds, spinnerCmd())
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) previewSelectedSearchResult() (tea.Model, tea.Cmd) {
@@ -765,7 +951,7 @@ func (m Model) previewSelectedSearchResult() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	selected := m.searchItems[m.searchIndex]
-	if !strings.EqualFold(strings.TrimSpace(selected.Item.ItemType), "playlist") {
+	if !isPlaylistResult(selected) {
 		return m, nil
 	}
 	id := strings.TrimSpace(selected.Item.ID)
@@ -778,11 +964,295 @@ func (m Model) previewSelectedSearchResult() (tea.Model, tea.Cmd) {
 	return m, browsePlaylistCmd(m.backend, m.config, m.selectedRoom(), selected, gen)
 }
 
+func (m Model) previewSelectedCarouselResult() (tea.Model, tea.Cmd) {
+	m.searchPreviewGeneration++
+	m.searchPreviewItemID = ""
+	m.searchPreviewLoading = false
+	m.searchPreviewItems = nil
+	if len(m.rooms) == 0 {
+		return m, nil
+	}
+	selected, ok := m.selectedCarouselResult()
+	if !ok {
+		return m, nil
+	}
+	id := strings.TrimSpace(selected.Item.ID)
+	if id == "" {
+		return m, nil
+	}
+	m.searchPreviewItemID = id
+	m.searchPreviewLoading = true
+	gen := m.searchPreviewGeneration
+	return m, browsePlaylistCmd(m.backend, m.config, m.selectedRoom(), selected, gen)
+}
+
+func (m Model) previewSelectedCarouselOrSearchResult() (tea.Model, tea.Cmd) {
+	if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+		return m.previewSelectedCarouselResult()
+	}
+	return m.previewSelectedSearchResult()
+}
+
+func (m Model) finishPlaylistPinToggle() (tea.Model, tea.Cmd) {
+	updated, previewCmd := m.previewSelectedCarouselOrSearchResult()
+	m = updated.(Model)
+	cmds := m.playlistThumbCmds()
+	if previewCmd != nil {
+		cmds = append(cmds, previewCmd)
+	}
+	return m, tea.Batch(cmds...)
+}
+
 func (m *Model) resetPlaylistPreview() {
 	m.searchPreviewGeneration++
 	m.searchPreviewItemID = ""
 	m.searchPreviewLoading = false
 	m.searchPreviewItems = nil
+}
+
+func (m Model) openSearch() (tea.Model, tea.Cmd) {
+	cmds := []tea.Cmd{tea.ClearScreen}
+	if m.playlistCarouselVisible() && len(m.rooms) > 0 {
+		m.startPlaylistCarouselLoad()
+		cmds = append(cmds, playlistCarouselCmd(m.backend, m.config, m.selectedRoom(), m.carouselStore, m.carouselGeneration))
+		if strings.TrimSpace(m.searchQuery) == "" {
+			m.searchFocus = searchFocusCarousel
+			updated, cmd := m.previewSelectedCarouselResult()
+			m = updated.(Model)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) startPlaylistCarouselLoad() {
+	m.carouselLoading = true
+	m.carouselGeneration++
+}
+
+func (m Model) playlistCarouselVisible() bool {
+	return strings.EqualFold(strings.TrimSpace(m.searchCategory), "playlists")
+}
+
+type playlistCarouselTab struct {
+	ID    string
+	Label string
+	Items []SearchResult
+}
+
+func (m Model) playlistCarouselTabs() []playlistCarouselTab {
+	if !m.playlistCarouselVisible() {
+		return nil
+	}
+	tabs := []playlistCarouselTab{}
+	if len(m.carouselPinned) > 0 {
+		tabs = append(tabs, playlistCarouselTab{ID: "pinned", Label: "Pinned", Items: m.carouselPinned})
+	}
+	if len(m.carouselRecent) > 0 {
+		tabs = append(tabs, playlistCarouselTab{ID: "recent", Label: "Recent", Items: m.carouselRecent})
+	}
+	if len(m.carouselMadeForYou) > 0 {
+		tabs = append(tabs, playlistCarouselTab{ID: "made_for_you", Label: "Made For You", Items: m.carouselMadeForYou})
+	}
+	return tabs
+}
+
+func (m Model) hasCarouselItems() bool {
+	return len(m.playlistCarouselTabs()) > 0
+}
+
+func (m *Model) clampCarouselSelection() {
+	tabs := m.playlistCarouselTabs()
+	if len(tabs) == 0 {
+		m.carouselTab = 0
+		m.carouselIndex = 0
+		return
+	}
+	if m.carouselTab < 0 {
+		m.carouselTab = 0
+	}
+	if m.carouselTab >= len(tabs) {
+		m.carouselTab = len(tabs) - 1
+	}
+	if m.carouselIndex < 0 {
+		m.carouselIndex = 0
+	}
+	if m.carouselIndex >= len(tabs[m.carouselTab].Items) {
+		m.carouselIndex = len(tabs[m.carouselTab].Items) - 1
+	}
+}
+
+func (m Model) selectedCarouselResult() (SearchResult, bool) {
+	tabs := m.playlistCarouselTabs()
+	if len(tabs) == 0 {
+		return SearchResult{}, false
+	}
+	tabIndex := clamp(m.carouselTab, 0, len(tabs)-1)
+	items := tabs[tabIndex].Items
+	if len(items) == 0 {
+		return SearchResult{}, false
+	}
+	itemIndex := clamp(m.carouselIndex, 0, len(items)-1)
+	return items[itemIndex], true
+}
+
+func (m *Model) moveCarouselSelection(direction string) {
+	tabs := m.playlistCarouselTabs()
+	if len(tabs) == 0 {
+		m.carouselTab = 0
+		m.carouselIndex = 0
+		return
+	}
+	m.clampCarouselSelection()
+	switch direction {
+	case "left":
+		if m.carouselIndex > 0 {
+			m.carouselIndex--
+			return
+		}
+		if m.carouselTab > 0 {
+			m.carouselTab--
+			m.carouselIndex = len(tabs[m.carouselTab].Items) - 1
+		}
+	case "right":
+		if m.carouselIndex < len(tabs[m.carouselTab].Items)-1 {
+			m.carouselIndex++
+			return
+		}
+		if m.carouselTab < len(tabs)-1 {
+			m.carouselTab++
+			m.carouselIndex = 0
+		}
+	}
+	m.clampCarouselSelection()
+}
+
+func (m *Model) toggleSelectedPlaylistPin() (bool, bool) {
+	result, ok := m.selectedPinnablePlaylistResult()
+	if !ok {
+		return false, false
+	}
+	// Invalidate any in-flight carousel refresh so it can't overwrite local pin changes.
+	m.carouselGeneration++
+	m.carouselLoading = false
+	item := playlistCarouselStoreItemFromResult(result)
+	if item.Title == "" && item.ID == "" {
+		return false, false
+	}
+	key := playlistCarouselStoreKey(item)
+	pins := normalizePlaylistCarouselItems(m.carouselStore.Pins, 0)
+	next := make([]playlistCarouselStoreItem, 0, len(pins)+1)
+	removed := false
+	for _, pin := range pins {
+		if playlistCarouselStoreKey(pin) == key {
+			removed = true
+			continue
+		}
+		next = append(next, pin)
+	}
+	if removed {
+		m.message = "unpinned " + result.Title()
+	} else {
+		next = append(next, item)
+		m.message = "pinned " + result.Title()
+	}
+	m.carouselStore.Pins = next
+	m.carouselStore = normalizePlaylistCarouselStore(m.carouselStore)
+	m.carouselPinned = playlistCarouselPinnedResults(m.carouselStore)
+	if !removed && len(m.carouselPinned) > 0 {
+		m.carouselTab = 0
+		m.carouselIndex = 0
+		for i, pinned := range m.carouselPinned {
+			if sameSearchResultID(pinned, result) || strings.EqualFold(strings.TrimSpace(pinned.Title()), strings.TrimSpace(result.Title())) {
+				m.carouselIndex = i
+				break
+			}
+		}
+	}
+	m.clampCarouselSelection()
+	if m.carouselThumbViews == nil {
+		m.carouselThumbViews = map[string]string{}
+	}
+	if err := SavePlaylistCarouselStore(m.config.CarouselPath, m.carouselStore); err != nil {
+		m.message = "playlist carousel save failed: " + err.Error()
+	}
+	return true, true
+}
+
+func (m *Model) recordRecentPlaylist(result SearchResult) {
+	if !isPlaylistResult(result) {
+		return
+	}
+	// Invalidate any in-flight carousel refresh so it can't overwrite local recent updates.
+	m.carouselGeneration++
+	m.carouselStore = addRecentPlaylistToStore(m.carouselStore, result)
+	m.carouselRecent = playlistCarouselRecentResults(m.carouselStore)
+	m.clampCarouselSelection()
+	if err := SavePlaylistCarouselStore(m.config.CarouselPath, m.carouselStore); err != nil {
+		m.message = "playlist carousel save failed: " + err.Error()
+	}
+}
+
+func (m Model) playlistThumbCmds() []tea.Cmd {
+	var cmds []tea.Cmd
+	seen := map[string]bool{}
+	for _, tab := range m.playlistCarouselTabs() {
+		for _, item := range tab.Items {
+			url := playlistArtworkURL(item)
+			if !fetchableArtworkURL(url) || seen[url] {
+				continue
+			}
+			seen[url] = true
+			if m.carouselThumbViews != nil {
+				if _, ok := m.carouselThumbViews[url]; ok {
+					continue
+				}
+			}
+			cmds = append(cmds, fetchPlaylistThumbCmd(url))
+		}
+	}
+	return cmds
+}
+
+func (m Model) selectedPinnablePlaylistResult() (SearchResult, bool) {
+	if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
+		return m.selectedCarouselResult()
+	}
+	if m.searchFocus != searchFocusResults || len(m.searchItems) == 0 || m.searchIndex < 0 || m.searchIndex >= len(m.searchItems) {
+		return SearchResult{}, false
+	}
+	result := m.searchItems[m.searchIndex]
+	if !isPlaylistResult(result) {
+		return SearchResult{}, false
+	}
+	return result, true
+}
+
+func (m *Model) ensureSearchSelectionVisible() {
+	if len(m.searchItems) == 0 {
+		m.searchOffset = 0
+		return
+	}
+	visible := m.searchVisibleRows()
+	if m.searchIndex < m.searchOffset {
+		m.searchOffset = m.searchIndex
+	}
+	if m.searchIndex >= m.searchOffset+visible {
+		m.searchOffset = m.searchIndex - visible + 1
+	}
+	maxOffset := max(0, len(m.searchItems)-visible)
+	if m.searchOffset > maxOffset {
+		m.searchOffset = maxOffset
+	}
+	if m.searchOffset < 0 {
+		m.searchOffset = 0
+	}
+}
+
+func (m Model) searchVisibleRows() int {
+	return 8
 }
 
 func (m *Model) toggleDashboardFocus() {
@@ -1062,7 +1532,12 @@ func playSearchCmd(backend Backend, cfg Config, room Room, result SearchResult) 
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 		defer cancel()
 		err := backend.PlaySearchResult(ctx, room, cfg.SearchService, result)
-		return actionMsg{message: "playing " + result.Title(), err: err}
+		return actionMsg{
+			message:        "playing " + result.Title(),
+			err:            err,
+			playlistPlayed: isPlaylistResult(result),
+			playedPlaylist: result,
+		}
 	}
 }
 
@@ -1073,6 +1548,206 @@ func browsePlaylistCmd(backend Backend, cfg Config, room Room, result SearchResu
 		items, err := backend.BrowsePlaylist(ctx, room, cfg.SearchService, result, playlistPreviewLimit)
 		return playlistPreviewMsg{itemID: strings.TrimSpace(result.Item.ID), generation: generation, items: items, err: err}
 	}
+}
+
+func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistCarouselStore, generation int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
+		defer cancel()
+
+		store = normalizePlaylistCarouselStore(store)
+		pinned := playlistCarouselPinnedResults(store)
+		nextPins := make([]playlistCarouselStoreItem, 0, len(store.Pins))
+		var firstErr error
+		for i, pin := range store.Pins {
+			title := strings.TrimSpace(pin.Title)
+			if title == "" {
+				continue
+			}
+			current := playlistCarouselResultFromStoreItem(pin)
+			needsResolve := strings.TrimSpace(pin.ID) == "" || playlistArtworkURL(current) == "" || isReleaseRadarTitle(title)
+			if !needsResolve {
+				nextPins = append(nextPins, pin)
+				continue
+			}
+
+			result, ok, err := backend.ResolvePinnedPlaylist(ctx, room, cfg.SearchService, title)
+			if err == nil && ok && strings.TrimSpace(pin.ID) != "" && !sameSearchResultID(current, result) && !isReleaseRadarTitle(title) {
+				ok = false
+			}
+			if err == nil && ok && isReleaseRadarTitle(title) && !isSpotifyReleaseRadarResult(result) {
+				ok = false
+			}
+			if err == nil && ok {
+				pin = playlistCarouselStoreItemFromResult(result)
+				pinned[i] = result
+				nextPins = append(nextPins, pin)
+				continue
+			}
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+			if err != nil {
+				if isReleaseRadarTitle(title) && strings.TrimSpace(pin.ID) != "" && !isSpotifyReleaseRadarResult(current) {
+					continue
+				}
+				nextPins = append(nextPins, pin)
+				continue
+			}
+			if isReleaseRadarTitle(title) {
+				continue
+			}
+			if strings.TrimSpace(pin.ID) != "" {
+				if strings.TrimSpace(pin.ArtworkURI) == "" && strings.TrimSpace(pin.AlbumArtURI) != "" {
+					pin.ArtworkURI = pin.AlbumArtURI
+				}
+			}
+			nextPins = append(nextPins, pin)
+		}
+		store.Pins = nextPins
+		pinned = playlistCarouselPinnedResults(store)
+
+		madeForYou, err := discoverMadeForYouPlaylists(ctx, backend, cfg, room, playlistShelfLimit)
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+
+		return playlistCarouselMsg{
+			generation: generation,
+			store:      store,
+			pinned:     pinned,
+			recent:     playlistCarouselRecentResults(store),
+			madeForYou: madeForYou,
+			err:        firstErr,
+		}
+	}
+}
+
+func discoverMadeForYouPlaylists(ctx context.Context, backend Backend, cfg Config, room Room, limit int) ([]SearchResult, error) {
+	root, err := backend.PlaylistShelf(ctx, room, cfg.SearchService, "root", 24)
+	if err != nil {
+		return nil, err
+	}
+	var out []SearchResult
+	var firstErr error
+	for _, shelf := range root {
+		if !madeForYouShelfTitle(shelf.Title()) {
+			continue
+		}
+		if isPlaylistResult(shelf) {
+			out = append(out, shelf)
+			continue
+		}
+		id := strings.TrimSpace(shelf.Item.ID)
+		if id == "" {
+			continue
+		}
+		items, err := backend.PlaylistShelf(ctx, room, cfg.SearchService, id, limit)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		for _, item := range items {
+			if isPlaylistResult(item) {
+				out = append(out, item)
+			}
+		}
+	}
+	out = dedupePlaylistResults(out, limit)
+	return out, firstErr
+}
+
+func madeForYouShelfTitle(title string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(title))
+	if normalized == "" {
+		return false
+	}
+	labels := []string{
+		"made for you",
+		"jump back in",
+		"your top mixes",
+		"recently played",
+		"your mixes",
+	}
+	for _, label := range labels {
+		if strings.Contains(normalized, label) {
+			return true
+		}
+	}
+	return strings.HasPrefix(normalized, "made for ")
+}
+
+func dedupePlaylistResults(items []SearchResult, limit int) []SearchResult {
+	out := make([]SearchResult, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		key := searchResultKey(item)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, item)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func searchResultKey(result SearchResult) string {
+	if id := strings.ToLower(strings.TrimSpace(result.Item.ID)); id != "" {
+		return "id:" + id
+	}
+	if title := strings.ToLower(strings.TrimSpace(result.Title())); title != "" {
+		return "title:" + title
+	}
+	return ""
+}
+
+func isPlaylistResult(result SearchResult) bool {
+	itemType := strings.ToLower(strings.TrimSpace(result.Item.ItemType))
+	return itemType == "playlist" || strings.Contains(itemType, "playlist")
+}
+
+func sameSearchResultID(a, b SearchResult) bool {
+	aID := strings.TrimSpace(a.Item.ID)
+	bID := strings.TrimSpace(b.Item.ID)
+	return aID != "" && bID != "" && strings.EqualFold(aID, bID)
+}
+
+func isReleaseRadarTitle(title string) bool {
+	return strings.EqualFold(strings.TrimSpace(title), "Release Radar")
+}
+
+func isLikedSongsTitle(title string) bool {
+	return strings.EqualFold(strings.TrimSpace(title), "Liked Songs")
+}
+
+func isSpotifyReleaseRadarResult(result SearchResult) bool {
+	if !isPlaylistResult(result) || !isReleaseRadarTitle(result.Title()) {
+		return false
+	}
+	creator := strings.ToLower(strings.TrimSpace(result.Item.Creator))
+	if creator == "spotify" {
+		return true
+	}
+	id := strings.ToLower(strings.TrimSpace(result.Item.ID))
+	return strings.Contains(id, "spotify:user:spotify:playlist:") ||
+		strings.HasPrefix(id, "spotify:playlist:37i9dq")
+}
+
+func playlistArtworkURL(result SearchResult) string {
+	if url := strings.TrimSpace(result.Item.ArtworkURI); url != "" {
+		return url
+	}
+	return strings.TrimSpace(result.Item.AlbumArtURI)
+}
+
+func fetchableArtworkURL(url string) bool {
+	url = strings.TrimSpace(strings.ToLower(url))
+	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
 func macHelperStartCmd(helper *macoshelper.Controller) tea.Cmd {

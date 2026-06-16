@@ -219,11 +219,14 @@ func (c *SMAPIClient) CompleteAuthentication(ctx context.Context, linkCode, link
 }
 
 type SMAPIItem struct {
-	ID       string `json:"id"`
-	ItemType string `json:"itemType"`
-	Title    string `json:"title"`
-	Summary  string `json:"summary,omitempty"`
-	MimeType string `json:"mimeType,omitempty"`
+	ID          string `json:"id"`
+	ItemType    string `json:"itemType"`
+	Title       string `json:"title"`
+	Summary     string `json:"summary,omitempty"`
+	MimeType    string `json:"mimeType,omitempty"`
+	Creator     string `json:"creator,omitempty"`
+	ArtworkURI  string `json:"artworkURI,omitempty"`
+	AlbumArtURI string `json:"albumArtURI,omitempty"`
 }
 
 type SMAPISearchResult struct {
@@ -259,17 +262,37 @@ func (c *SMAPIClient) Search(ctx context.Context, category, term string, index, 
 	}
 
 	type mediaMetadata struct {
-		ID       string `xml:"id"`
-		ItemType string `xml:"itemType"`
-		Title    string `xml:"title"`
-		MimeType string `xml:"mimeType"`
-		Summary  string `xml:"summary"`
+		ID            string `xml:"id"`
+		ItemType      string `xml:"itemType"`
+		Title         string `xml:"title"`
+		MimeType      string `xml:"mimeType"`
+		Summary       string `xml:"summary"`
+		Creator       string `xml:"creator"`
+		Author        string `xml:"author"`
+		Artist        string `xml:"artist"`
+		AlbumArtURI   string `xml:"albumArtURI"`
+		ArtworkURI    string `xml:"artworkURI"`
+		ArtworkURIAlt string `xml:"artworkUri"`
+		ArtworkURL    string `xml:"artworkURL"`
+		ArtworkURLAlt string `xml:"artworkUrl"`
+		ImageURI      string `xml:"imageURI"`
+		ImageURL      string `xml:"imageUrl"`
 	}
 	type mediaCollection struct {
-		ID       string `xml:"id"`
-		ItemType string `xml:"itemType"`
-		Title    string `xml:"title"`
-		Summary  string `xml:"summary"`
+		ID            string `xml:"id"`
+		ItemType      string `xml:"itemType"`
+		Title         string `xml:"title"`
+		Summary       string `xml:"summary"`
+		Creator       string `xml:"creator"`
+		Author        string `xml:"author"`
+		Artist        string `xml:"artist"`
+		AlbumArtURI   string `xml:"albumArtURI"`
+		ArtworkURI    string `xml:"artworkURI"`
+		ArtworkURIAlt string `xml:"artworkUri"`
+		ArtworkURL    string `xml:"artworkURL"`
+		ArtworkURLAlt string `xml:"artworkUrl"`
+		ImageURI      string `xml:"imageURI"`
+		ImageURL      string `xml:"imageUrl"`
 	}
 	var out struct {
 		Result struct {
@@ -299,19 +322,25 @@ func (c *SMAPIClient) Search(ctx context.Context, category, term string, index, 
 	}
 	for _, md := range out.Result.MD {
 		res.MediaMetadata = append(res.MediaMetadata, SMAPIItem{
-			ID:       strings.TrimSpace(md.ID),
-			ItemType: strings.TrimSpace(md.ItemType),
-			Title:    strings.TrimSpace(md.Title),
-			Summary:  strings.TrimSpace(md.Summary),
-			MimeType: strings.TrimSpace(md.MimeType),
+			ID:          strings.TrimSpace(md.ID),
+			ItemType:    strings.TrimSpace(md.ItemType),
+			Title:       strings.TrimSpace(md.Title),
+			Summary:     strings.TrimSpace(md.Summary),
+			MimeType:    strings.TrimSpace(md.MimeType),
+			Creator:     smapiCreator(md.Creator, md.Author, md.Artist),
+			ArtworkURI:  smapiArtworkURI(md.ArtworkURI, md.ArtworkURIAlt, md.ArtworkURL, md.ArtworkURLAlt, md.ImageURI, md.ImageURL, md.AlbumArtURI),
+			AlbumArtURI: strings.TrimSpace(md.AlbumArtURI),
 		})
 	}
 	for _, mc := range out.Result.MC {
 		res.MediaCollection = append(res.MediaCollection, SMAPIItem{
-			ID:       strings.TrimSpace(mc.ID),
-			ItemType: strings.TrimSpace(mc.ItemType),
-			Title:    strings.TrimSpace(mc.Title),
-			Summary:  strings.TrimSpace(mc.Summary),
+			ID:          strings.TrimSpace(mc.ID),
+			ItemType:    strings.TrimSpace(mc.ItemType),
+			Title:       strings.TrimSpace(mc.Title),
+			Summary:     strings.TrimSpace(mc.Summary),
+			Creator:     smapiCreator(mc.Creator, mc.Author, mc.Artist),
+			ArtworkURI:  smapiArtworkURI(mc.ArtworkURI, mc.ArtworkURIAlt, mc.ArtworkURL, mc.ArtworkURLAlt, mc.ImageURI, mc.ImageURL, mc.AlbumArtURI),
+			AlbumArtURI: strings.TrimSpace(mc.AlbumArtURI),
 		})
 	}
 	return res, nil
@@ -352,17 +381,37 @@ func (c *SMAPIClient) GetMetadata(ctx context.Context, id string, index, count i
 	}
 
 	type mediaMetadata struct {
-		ID       string `xml:"id"`
-		ItemType string `xml:"itemType"`
-		Title    string `xml:"title"`
-		MimeType string `xml:"mimeType"`
-		Summary  string `xml:"summary"`
+		ID            string `xml:"id"`
+		ItemType      string `xml:"itemType"`
+		Title         string `xml:"title"`
+		MimeType      string `xml:"mimeType"`
+		Summary       string `xml:"summary"`
+		Creator       string `xml:"creator"`
+		Author        string `xml:"author"`
+		Artist        string `xml:"artist"`
+		AlbumArtURI   string `xml:"albumArtURI"`
+		ArtworkURI    string `xml:"artworkURI"`
+		ArtworkURIAlt string `xml:"artworkUri"`
+		ArtworkURL    string `xml:"artworkURL"`
+		ArtworkURLAlt string `xml:"artworkUrl"`
+		ImageURI      string `xml:"imageURI"`
+		ImageURL      string `xml:"imageUrl"`
 	}
 	type mediaCollection struct {
-		ID       string `xml:"id"`
-		ItemType string `xml:"itemType"`
-		Title    string `xml:"title"`
-		Summary  string `xml:"summary"`
+		ID            string `xml:"id"`
+		ItemType      string `xml:"itemType"`
+		Title         string `xml:"title"`
+		Summary       string `xml:"summary"`
+		Creator       string `xml:"creator"`
+		Author        string `xml:"author"`
+		Artist        string `xml:"artist"`
+		AlbumArtURI   string `xml:"albumArtURI"`
+		ArtworkURI    string `xml:"artworkURI"`
+		ArtworkURIAlt string `xml:"artworkUri"`
+		ArtworkURL    string `xml:"artworkURL"`
+		ArtworkURLAlt string `xml:"artworkUrl"`
+		ImageURI      string `xml:"imageURI"`
+		ImageURL      string `xml:"imageUrl"`
 	}
 	var out struct {
 		Result struct {
@@ -391,22 +440,46 @@ func (c *SMAPIClient) GetMetadata(ctx context.Context, id string, index, count i
 	}
 	for _, md := range out.Result.MD {
 		res.MediaMetadata = append(res.MediaMetadata, SMAPIItem{
-			ID:       strings.TrimSpace(md.ID),
-			ItemType: strings.TrimSpace(md.ItemType),
-			Title:    strings.TrimSpace(md.Title),
-			Summary:  strings.TrimSpace(md.Summary),
-			MimeType: strings.TrimSpace(md.MimeType),
+			ID:          strings.TrimSpace(md.ID),
+			ItemType:    strings.TrimSpace(md.ItemType),
+			Title:       strings.TrimSpace(md.Title),
+			Summary:     strings.TrimSpace(md.Summary),
+			MimeType:    strings.TrimSpace(md.MimeType),
+			Creator:     smapiCreator(md.Creator, md.Author, md.Artist),
+			ArtworkURI:  smapiArtworkURI(md.ArtworkURI, md.ArtworkURIAlt, md.ArtworkURL, md.ArtworkURLAlt, md.ImageURI, md.ImageURL, md.AlbumArtURI),
+			AlbumArtURI: strings.TrimSpace(md.AlbumArtURI),
 		})
 	}
 	for _, mc := range out.Result.MC {
 		res.MediaCollection = append(res.MediaCollection, SMAPIItem{
-			ID:       strings.TrimSpace(mc.ID),
-			ItemType: strings.TrimSpace(mc.ItemType),
-			Title:    strings.TrimSpace(mc.Title),
-			Summary:  strings.TrimSpace(mc.Summary),
+			ID:          strings.TrimSpace(mc.ID),
+			ItemType:    strings.TrimSpace(mc.ItemType),
+			Title:       strings.TrimSpace(mc.Title),
+			Summary:     strings.TrimSpace(mc.Summary),
+			Creator:     smapiCreator(mc.Creator, mc.Author, mc.Artist),
+			ArtworkURI:  smapiArtworkURI(mc.ArtworkURI, mc.ArtworkURIAlt, mc.ArtworkURL, mc.ArtworkURLAlt, mc.ImageURI, mc.ImageURL, mc.AlbumArtURI),
+			AlbumArtURI: strings.TrimSpace(mc.AlbumArtURI),
 		})
 	}
 	return res, nil
+}
+
+func smapiCreator(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func smapiArtworkURI(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func (c *SMAPIClient) searchCategories(ctx context.Context) (map[string]string, error) {

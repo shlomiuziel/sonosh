@@ -83,6 +83,8 @@ type Backend interface {
 	ClearQueue(context.Context, Room) error
 	MoveQueuePosition(context.Context, Room, int, int) error
 	Search(context.Context, Room, string, string, string, int) ([]SearchResult, error)
+	PlaylistShelf(context.Context, Room, string, string, int) ([]SearchResult, error)
+	ResolvePinnedPlaylist(context.Context, Room, string, string) (SearchResult, bool, error)
 	BrowsePlaylist(context.Context, Room, string, SearchResult, int) ([]SearchResult, error)
 	PlaySearchResult(context.Context, Room, string, SearchResult) error
 }
@@ -442,16 +444,7 @@ func formatTimecode(d time.Duration) string {
 }
 
 func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, category, query string, limit int) ([]SearchResult, error) {
-	speaker := sonos.NewClient(room.IP, b.Timeout)
-	svc, err := b.findService(ctx, speaker, serviceName)
-	if err != nil {
-		return nil, err
-	}
-	store, err := sonos.NewDefaultSMAPITokenStore()
-	if err != nil {
-		return nil, err
-	}
-	smapi, err := sonos.NewSMAPIClient(ctx, speaker, svc, store)
+	smapi, err := b.smapiClient(ctx, room, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -463,30 +456,82 @@ func (b *SonosBackend) Search(ctx context.Context, room Room, serviceName, categ
 	items = append(items, res.MediaCollection...)
 	out := make([]SearchResult, 0, len(items))
 	for _, item := range items {
+		item = normalizeSearchResultArtwork(room, item)
 		out = append(out, SearchResult{Item: item})
 	}
 	return out, nil
 }
 
-func (b *SonosBackend) BrowsePlaylist(ctx context.Context, room Room, serviceName string, result SearchResult, limit int) ([]SearchResult, error) {
-	if !strings.EqualFold(strings.TrimSpace(result.Item.ItemType), "playlist") {
-		return nil, nil
+func (b *SonosBackend) PlaylistShelf(ctx context.Context, room Room, serviceName, shelfID string, limit int) ([]SearchResult, error) {
+	if limit <= 0 {
+		limit = playlistShelfLimit
 	}
-
-	speaker := sonos.NewClient(room.IP, b.Timeout)
-	svc, err := b.findService(ctx, speaker, serviceName)
+	smapi, err := b.smapiClient(ctx, room, serviceName)
 	if err != nil {
 		return nil, err
+	}
+	res, err := smapi.GetMetadata(ctx, shelfID, 0, limit, false)
+	if err != nil {
+		return nil, err
+	}
+	items := append([]sonos.SMAPIItem{}, res.MediaCollection...)
+	items = append(items, res.MediaMetadata...)
+	out := make([]SearchResult, 0, len(items))
+	for _, item := range items {
+		item = normalizeSearchResultArtwork(room, item)
+		out = append(out, SearchResult{Item: item})
+	}
+	return out, nil
+}
+
+func (b *SonosBackend) ResolvePinnedPlaylist(ctx context.Context, room Room, serviceName, title string) (SearchResult, bool, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return SearchResult{}, false, nil
+	}
+	results, err := b.Search(ctx, room, serviceName, "playlists", title, 25)
+	if err != nil {
+		return SearchResult{}, false, err
+	}
+	if len(results) == 0 {
+		return SearchResult{}, false, nil
+	}
+	if isReleaseRadarTitle(title) {
+		for _, result := range results {
+			if isSpotifyReleaseRadarResult(result) {
+				return result, true, nil
+			}
+		}
+		return SearchResult{}, false, nil
+	}
+	foldedTitle := strings.ToLower(title)
+	for _, result := range results {
+		if isPlaylistResult(result) && strings.EqualFold(strings.TrimSpace(result.Title()), title) {
+			return result, true, nil
+		}
+	}
+	for _, result := range results {
+		if isPlaylistResult(result) && strings.Contains(strings.ToLower(result.Title()), foldedTitle) {
+			return result, true, nil
+		}
+	}
+	for _, result := range results {
+		if isPlaylistResult(result) {
+			return result, true, nil
+		}
+	}
+	return SearchResult{}, false, nil
+}
+
+func (b *SonosBackend) BrowsePlaylist(ctx context.Context, room Room, serviceName string, result SearchResult, limit int) ([]SearchResult, error) {
+	if !isPlaylistResult(result) {
+		return nil, nil
 	}
 
 	if limit <= 0 {
 		limit = 6
 	}
-	store, err := sonos.NewDefaultSMAPITokenStore()
-	if err != nil {
-		return nil, err
-	}
-	smapi, err := sonos.NewSMAPIClient(ctx, speaker, svc, store)
+	smapi, err := b.smapiClient(ctx, room, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -500,9 +545,30 @@ func (b *SonosBackend) BrowsePlaylist(ctx context.Context, room Room, serviceNam
 	}
 	out := make([]SearchResult, 0, len(items))
 	for _, item := range items {
+		item = normalizeSearchResultArtwork(room, item)
 		out = append(out, SearchResult{Item: item})
 	}
 	return out, nil
+}
+
+func normalizeSearchResultArtwork(room Room, item sonos.SMAPIItem) sonos.SMAPIItem {
+	ip := room.transportIP()
+	item.ArtworkURI = sonos.AlbumArtURL(ip, item.ArtworkURI)
+	item.AlbumArtURI = sonos.AlbumArtURL(ip, item.AlbumArtURI)
+	return item
+}
+
+func (b *SonosBackend) smapiClient(ctx context.Context, room Room, serviceName string) (*sonos.SMAPIClient, error) {
+	speaker := sonos.NewClient(room.IP, b.Timeout)
+	svc, err := b.findService(ctx, speaker, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	store, err := sonos.NewDefaultSMAPITokenStore()
+	if err != nil {
+		return nil, err
+	}
+	return sonos.NewSMAPIClient(ctx, speaker, svc, store)
 }
 
 func (b *SonosBackend) PlaySearchResult(ctx context.Context, room Room, serviceName string, result SearchResult) error {

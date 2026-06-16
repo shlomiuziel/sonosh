@@ -20,6 +20,10 @@ func main() {
 	if err != nil {
 		layoutConfigPath = ""
 	}
+	carouselConfigPath, err := tui.DefaultPlaylistCarouselConfigPath()
+	if err != nil {
+		carouselConfigPath = ""
+	}
 	storedTheme, err := tui.LoadThemeName(themeConfigPath)
 	if err != nil {
 		storedTheme = ""
@@ -49,6 +53,7 @@ func main() {
 		ThemeConfigPath:  themeConfigPath,
 		Compact:          storedCompact,
 		LayoutConfigPath: layoutConfigPath,
+		CarouselPath:     carouselConfigPath,
 		MacHelperPath:    *macHelperPath,
 	}
 	model := tui.NewModel(tui.NewSonosBackend(cfg.Timeout), cfg)

@@ -606,6 +606,392 @@ func TestPlaylistSearchShowsPreviewTracks(t *testing.T) {
 	}
 }
 
+func TestPlaylistCarouselRendersOnlyInPlaylistMode(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.mode = modeSearch
+	tracksView := model.renderSearchContent(76)
+	if strings.Contains(tracksView, "Pinned") {
+		t.Fatalf("track search rendered playlist carousel:\n%s", tracksView)
+	}
+
+	model.searchCategory = "playlists"
+	playlistView := model.renderSearchContent(76)
+	fieldAt := strings.Index(playlistView, "type to search")
+	pinnedAt := strings.Index(playlistView, "Pinned")
+	placeholderAt := strings.Index(playlistView, "Search results will appear here")
+	if pinnedAt < 0 {
+		t.Fatalf("playlist carousel missing:\n%s", playlistView)
+	}
+	if !(fieldAt >= 0 && pinnedAt > fieldAt && placeholderAt > pinnedAt) {
+		t.Fatalf("carousel not between search field and result placeholder:\n%s", playlistView)
+	}
+}
+
+func TestPlaylistCarouselResolvesDefaultPinsWithFallback(t *testing.T) {
+	backend := &fakeBackend{}
+	model := NewModel(backend, testConfig())
+	msg := runCmd(playlistCarouselCmd(backend, testConfig(), Room{Name: "Kitchen", IP: "192.0.2.10"}, model.carouselStore, 1)).(playlistCarouselMsg)
+
+	if got := strings.Join(backend.resolvedTitles, ","); got != "Release Radar" {
+		t.Fatalf("resolved titles = %q", got)
+	}
+	if len(msg.pinned) != 0 {
+		t.Fatalf("unresolved Release Radar should be removed, got pins %#v", msg.pinned)
+	}
+}
+
+func TestPlaylistCarouselKeepsOnlySpotifyReleaseRadar(t *testing.T) {
+	backend := &fakeBackend{
+		resolveFn: func(title string) (SearchResult, bool) {
+			switch title {
+			case "Release Radar":
+				return SearchResult{Item: sonos.SMAPIItem{
+					ID:         "spotify:playlist:37i9dQZF1DX0s5kDXi1oC5",
+					ItemType:   "playlist",
+					Title:      title,
+					Creator:    "Spotify",
+					ArtworkURI: "https://example.test/release-radar.jpg",
+				}}, true
+			default:
+				return SearchResult{}, false
+			}
+		},
+	}
+	model := NewModel(backend, testConfig())
+	msg := runCmd(playlistCarouselCmd(backend, testConfig(), Room{Name: "Kitchen", IP: "192.0.2.10"}, model.carouselStore, 1)).(playlistCarouselMsg)
+
+	if len(msg.pinned) != 1 {
+		t.Fatalf("pins = %#v, want release radar only", msg.pinned)
+	}
+	releaseRadar := msg.pinned[0]
+	if releaseRadar.Title() != "Release Radar" || releaseRadar.Item.Creator != "Spotify" || releaseRadar.Item.ArtworkURI == "" {
+		t.Fatalf("Release Radar was not preserved with Spotify metadata: %#v", releaseRadar)
+	}
+}
+
+func TestPlaylistCarouselDropsRandomReleaseRadar(t *testing.T) {
+	store := defaultPlaylistCarouselStore()
+	store.Pins[0] = playlistCarouselStoreItem{
+		ID:       "spotify:playlist:random",
+		ItemType: "playlist",
+		Title:    "Release Radar",
+		Creator:  "Someone Else",
+	}
+	backend := &fakeBackend{
+		resolveFn: func(title string) (SearchResult, bool) {
+			if title == "Release Radar" {
+				return SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:random", ItemType: "playlist", Title: title, Creator: "Someone Else"}}, true
+			}
+			return SearchResult{}, false
+		},
+	}
+	msg := runCmd(playlistCarouselCmd(backend, testConfig(), Room{Name: "Kitchen", IP: "192.0.2.10"}, store, 1)).(playlistCarouselMsg)
+
+	for _, pin := range msg.pinned {
+		if pin.Title() == "Release Radar" {
+			t.Fatalf("random Release Radar should be removed: %#v", msg.pinned)
+		}
+	}
+}
+
+func TestPlaylistCarouselPinAndRecentPersistence(t *testing.T) {
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.CarouselPath = filepath.Join(dir, "playlist_carousel.json")
+	backend := &fakeBackend{}
+	model := NewModel(backend, cfg)
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusCarousel
+	recent := SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:recent", ItemType: "playlist", Title: "Recent Playlist"}}
+	model.carouselRecent = []SearchResult{recent}
+	model.carouselTab = 1
+
+	updated, _ := model.Update(key(" "))
+	model = updated.(Model)
+	if model.carouselTab != 0 || len(model.carouselPinned) == 0 || model.carouselPinned[model.carouselIndex].Item.ID != "spotify:playlist:recent" {
+		t.Fatalf("pinning did not switch to pinned tab: tab=%d index=%d pins=%#v", model.carouselTab, model.carouselIndex, model.carouselPinned)
+	}
+	store, err := LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore: %v", err)
+	}
+	if !storeHasPlaylist(store.Pins, "spotify:playlist:recent") {
+		t.Fatalf("pinned playlist was not persisted: %#v", store.Pins)
+	}
+
+	model.carouselTab = 0
+	model.carouselIndex = len(model.carouselPinned) - 1
+	updated, _ = model.Update(key(" "))
+	model = updated.(Model)
+	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore after unpin: %v", err)
+	}
+	if storeHasPlaylist(store.Pins, "spotify:playlist:recent") {
+		t.Fatalf("unpinned playlist still persisted: %#v", store.Pins)
+	}
+
+	playlistA := SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:a", ItemType: "playlist", Title: "Playlist A"}}
+	playlistB := SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:b", ItemType: "playlist", Title: "Playlist B"}}
+	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
+	model = updated.(Model)
+	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistB})
+	model = updated.(Model)
+	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
+	model = updated.(Model)
+	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore recent: %v", err)
+	}
+	if len(store.Recent) < 2 || store.Recent[0].ID != "spotify:playlist:a" || store.Recent[1].ID != "spotify:playlist:b" {
+		t.Fatalf("recent MRU order = %#v", store.Recent)
+	}
+}
+
+func TestPlaylistCarouselPinSurvivesStaleRefresh(t *testing.T) {
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.CarouselPath = filepath.Join(dir, "playlist_carousel.json")
+	backend := &fakeBackend{}
+	model := NewModel(backend, cfg)
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusCarousel
+	model.carouselPinned = nil
+	model.carouselStore.Pins = nil
+	model.carouselRecent = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:recent", ItemType: "playlist", Title: "Recent Playlist"}},
+	}
+	model.startPlaylistCarouselLoad()
+	staleGeneration := model.carouselGeneration
+	staleStore := model.carouselStore
+
+	updated, _ := model.Update(key(" "))
+	model = updated.(Model)
+	if !storeHasPlaylist(model.carouselStore.Pins, "spotify:playlist:recent") {
+		t.Fatalf("pin was not applied locally: %#v", model.carouselStore.Pins)
+	}
+
+	updated, _ = model.Update(playlistCarouselMsg{
+		generation: staleGeneration,
+		store:      staleStore,
+		pinned:     playlistCarouselPinnedResults(staleStore),
+		recent:     playlistCarouselRecentResults(staleStore),
+	})
+	model = updated.(Model)
+	if !storeHasPlaylist(model.carouselStore.Pins, "spotify:playlist:recent") {
+		t.Fatalf("stale refresh overwrote local pin: %#v", model.carouselStore.Pins)
+	}
+}
+
+func TestPlaylistSearchResultPinAndUnpinWithP(t *testing.T) {
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.CarouselPath = filepath.Join(dir, "playlist_carousel.json")
+	model := NewModel(&fakeBackend{}, cfg)
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.carouselStore.Pins = nil
+	model.carouselPinned = nil
+	model.searchFocus = searchFocusResults
+	model.searchQuery = "mix"
+	model.searchPreviewQuery = "mix"
+	model.searchItems = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:mix", ItemType: "playlist", Title: "Mix Playlist"}},
+	}
+
+	updated, _ := model.Update(key("ctrl+f"))
+	model = updated.(Model)
+	if model.carouselTab != 0 || len(model.carouselPinned) != 1 || model.carouselPinned[0].Item.ID != "spotify:playlist:mix" {
+		t.Fatalf("result pin did not update pinned carousel: tab=%d index=%d pins=%#v", model.carouselTab, model.carouselIndex, model.carouselPinned)
+	}
+	store, err := LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore: %v", err)
+	}
+	if !storeHasPlaylist(store.Pins, "spotify:playlist:mix") {
+		t.Fatalf("pinned result not persisted: %#v", store.Pins)
+	}
+
+	model.searchFocus = searchFocusCarousel
+	model.carouselIndex = 0
+	updated, _ = model.Update(key("ctrl+f"))
+	model = updated.(Model)
+	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore after unpin: %v", err)
+	}
+	if storeHasPlaylist(store.Pins, "spotify:playlist:mix") {
+		t.Fatalf("unpinned result still persisted: %#v", store.Pins)
+	}
+}
+
+func TestPlaylistSearchResultPinStartsThumbFetchImmediately(t *testing.T) {
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.CarouselPath = filepath.Join(dir, "playlist_carousel.json")
+	model := NewModel(&fakeBackend{}, cfg)
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.carouselStore.Pins = nil
+	model.carouselPinned = nil
+	model.searchFocus = searchFocusResults
+	model.searchItems = []SearchResult{
+		{Item: sonos.SMAPIItem{
+			ID:         "spotify:playlist:mix",
+			ItemType:   "playlist",
+			Title:      "Mix Playlist",
+			ArtworkURI: "https://example.test/mix.jpg",
+		}},
+	}
+
+	updated, cmd := model.Update(key("ctrl+f"))
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected pin command batch")
+	}
+	msg := runCmd(cmd)
+	if _, ok := msg.(playlistThumbMsg); !ok {
+		t.Fatalf("expected playlist thumb fetch after pin, got %T", msg)
+	}
+}
+
+func TestPlaylistCarouselPreviewIgnoresStaleResponses(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+		browseFn: func(id string) []SearchResult {
+			return []SearchResult{{Item: sonos.SMAPIItem{ID: id + ":track", ItemType: "track", Title: "Track for " + id}}}
+		},
+	}
+	model := NewModel(backend, testConfig())
+	model.rooms = backend.rooms
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusCarousel
+	model.carouselPinned = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:one", ItemType: "playlist", Title: "One"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:two", ItemType: "playlist", Title: "Two"}},
+	}
+
+	updated, staleCmd := model.previewSelectedCarouselResult()
+	model = updated.(Model)
+	if staleCmd == nil {
+		t.Fatal("expected first preview command")
+	}
+	updated, freshCmd := model.Update(key("right"))
+	model = updated.(Model)
+	if freshCmd == nil {
+		t.Fatal("expected preview command after moving carousel")
+	}
+	updated, _ = model.Update(runCmd(freshCmd))
+	model = updated.(Model)
+	if model.searchPreviewItemID != "spotify:playlist:two" || len(model.searchPreviewItems) != 1 {
+		t.Fatalf("fresh preview not applied: id=%q items=%#v", model.searchPreviewItemID, model.searchPreviewItems)
+	}
+	updated, _ = model.Update(runCmd(staleCmd))
+	model = updated.(Model)
+	if model.searchPreviewItemID != "spotify:playlist:two" || model.searchPreviewItems[0].Item.ID != "spotify:playlist:two:track" {
+		t.Fatalf("stale preview overwrote fresh preview: id=%q items=%#v", model.searchPreviewItemID, model.searchPreviewItems)
+	}
+}
+
+func TestPlaylistCarouselAndSearchNavigationDoNotConflict(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusResults
+	model.searchQuery = "mix"
+	model.searchItems = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:one", ItemType: "playlist", Title: "One"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:two", ItemType: "playlist", Title: "Two"}},
+	}
+	model.carouselPinned = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:pinned-one", ItemType: "playlist", Title: "Pinned One"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:pinned-two", ItemType: "playlist", Title: "Pinned Two"}},
+	}
+
+	updated, _ := model.Update(key("down"))
+	model = updated.(Model)
+	if model.searchFocus != searchFocusResults || model.searchIndex != 1 {
+		t.Fatalf("down in results changed focus/index to %v/%d", model.searchFocus, model.searchIndex)
+	}
+	updated, _ = model.Update(key("up"))
+	model = updated.(Model)
+	if model.searchFocus != searchFocusResults || model.searchIndex != 0 {
+		t.Fatalf("up within results changed focus/index to %v/%d", model.searchFocus, model.searchIndex)
+	}
+	updated, _ = model.Update(key("up"))
+	model = updated.(Model)
+	if model.searchFocus != searchFocusCarousel {
+		t.Fatalf("up at first result did not move to carousel: %v", model.searchFocus)
+	}
+	updated, _ = model.Update(key("right"))
+	model = updated.(Model)
+	if model.carouselIndex != 1 || model.searchIndex != 0 {
+		t.Fatalf("right in carousel changed carousel/search indexes to %d/%d", model.carouselIndex, model.searchIndex)
+	}
+	updated, _ = model.Update(key("down"))
+	model = updated.(Model)
+	if model.searchFocus != searchFocusResults || model.searchIndex != 0 {
+		t.Fatalf("down from carousel did not return to results: %v/%d", model.searchFocus, model.searchIndex)
+	}
+}
+
+func TestSearchResultsScrollSelectionIntoView(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.mode = modeSearch
+	model.searchItems = make([]SearchResult, 12)
+	for i := range model.searchItems {
+		model.searchItems[i] = SearchResult{Item: sonos.SMAPIItem{ID: fmt.Sprintf("spotify:track:%d", i), ItemType: "track", Title: fmt.Sprintf("Track %d", i+1)}}
+	}
+	model.searchFocus = searchFocusResults
+
+	for i := 0; i < 9; i++ {
+		updated, _ := model.Update(key("down"))
+		model = updated.(Model)
+	}
+	if model.searchIndex != 9 {
+		t.Fatalf("searchIndex = %d, want 9", model.searchIndex)
+	}
+	if model.searchOffset == 0 {
+		t.Fatal("searchOffset did not advance")
+	}
+
+	view := model.renderSearchContent(76)
+	if !strings.Contains(view, "Track 10") {
+		t.Fatalf("selected track not visible after scroll:\n%s", view)
+	}
+	if !strings.Contains(view, "+") {
+		t.Fatalf("expected scroll indicators in view:\n%s", view)
+	}
+}
+
+func TestPlaylistCarouselArtworkFallbackRendering(t *testing.T) {
+	model := NewModel(&fakeBackend{}, testConfig())
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusCarousel
+	model.carouselPinned = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:release-radar", ItemType: "playlist", Title: "Release Radar"}},
+	}
+	view := model.renderPlaylistCarousel(76)
+	if !strings.Contains(view, "RR") {
+		t.Fatalf("fallback initials missing:\n%s", view)
+	}
+
+	model.carouselPinned[0].Item.ArtworkURI = "https://example.test/cover.jpg"
+	model.carouselThumbViews = map[string]string{"https://example.test/cover.jpg": "▓▓▓▓▓▓▓▓\n▓▓▓▓▓▓▓▓\n▓▓▓▓▓▓▓▓\n▓▓▓▓▓▓▓▓"}
+	view = model.renderPlaylistCarousel(76)
+	if strings.Contains(view, "RR") || !strings.Contains(view, "▓▓▓▓▓▓▓▓") {
+		t.Fatalf("thumbnail artwork missing:\n%s", view)
+	}
+}
+
 func TestMacHelperCommandDispatchesTransport(t *testing.T) {
 	backend := &fakeBackend{
 		rooms:  []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
@@ -1162,6 +1548,15 @@ func testConfig() Config {
 	return Config{Timeout: time.Second, SearchService: "Spotify", SearchCategory: "tracks", SearchLimit: 10}
 }
 
+func storeHasPlaylist(items []playlistCarouselStoreItem, id string) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
 func key(value string) tea.KeyMsg {
 	switch value {
 	case "enter":
@@ -1178,8 +1573,12 @@ func key(value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeySpace}
 	case "ctrl+l":
 		return tea.KeyMsg{Type: tea.KeyCtrlL}
+	case "ctrl+f":
+		return tea.KeyMsg{Type: tea.KeyCtrlF}
 	case "ctrl+p":
 		return tea.KeyMsg{Type: tea.KeyCtrlP}
+	case "ctrl+t":
+		return tea.KeyMsg{Type: tea.KeyCtrlT}
 	case "ctrl+v":
 		return tea.KeyMsg{Type: tea.KeyCtrlV}
 	default:
@@ -1207,6 +1606,8 @@ type fakeBackend struct {
 	results             []SearchResult
 	searchFn            func(query string) []SearchResult
 	browseFn            func(id string) []SearchResult
+	shelfFn             func(id string) []SearchResult
+	resolveFn           func(title string) (SearchResult, bool)
 	transportAction     string
 	volume              int
 	muted               bool
@@ -1225,6 +1626,8 @@ type fakeBackend struct {
 	played              sonos.SMAPIItem
 	searchQueries       []string
 	searchCategories    []string
+	shelfIDs            []string
+	resolvedTitles      []string
 }
 
 func (f *fakeBackend) Discover(context.Context) ([]Room, error) {
@@ -1311,6 +1714,23 @@ func (f *fakeBackend) Search(_ context.Context, _ Room, _, category, query strin
 		return f.searchFn(query), nil
 	}
 	return f.results, nil
+}
+
+func (f *fakeBackend) PlaylistShelf(_ context.Context, _ Room, _, shelfID string, _ int) ([]SearchResult, error) {
+	f.shelfIDs = append(f.shelfIDs, shelfID)
+	if f.shelfFn != nil {
+		return f.shelfFn(shelfID), nil
+	}
+	return nil, nil
+}
+
+func (f *fakeBackend) ResolvePinnedPlaylist(_ context.Context, _ Room, _, title string) (SearchResult, bool, error) {
+	f.resolvedTitles = append(f.resolvedTitles, title)
+	if f.resolveFn != nil {
+		result, ok := f.resolveFn(title)
+		return result, ok, nil
+	}
+	return SearchResult{}, false, nil
 }
 
 func (f *fakeBackend) BrowsePlaylist(_ context.Context, _ Room, _ string, result SearchResult, _ int) ([]SearchResult, error) {

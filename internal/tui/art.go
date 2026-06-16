@@ -22,6 +22,8 @@ import (
 const (
 	albumArtColumns = 16
 	albumArtRows    = 8
+	thumbArtColumns = 8
+	thumbArtRows    = 4
 )
 
 func fetchAlbumArtCmd(url string, kitty bool) tea.Cmd {
@@ -46,6 +48,34 @@ func fetchAlbumArtCmd(url string, kitty bool) tea.Cmd {
 		}
 		return albumArtMsg{url: url, view: view, fallbackView: fallbackView}
 	}
+}
+
+func fetchPlaylistThumbCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		client := &http.Client{Timeout: 8 * time.Second}
+		resp, err := client.Get(url)
+		if err != nil {
+			return playlistThumbMsg{url: url, err: err}
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return playlistThumbMsg{url: url, err: fmt.Errorf("playlist art fetch returned %s", resp.Status)}
+		}
+
+		raw, err := imageDataFromReader(resp.Body)
+		if err != nil {
+			return playlistThumbMsg{url: url, err: err}
+		}
+		view, err := renderPlaylistThumbView(raw)
+		if err != nil {
+			return playlistThumbMsg{url: url, err: err}
+		}
+		return playlistThumbMsg{url: url, view: view}
+	}
+}
+
+func renderPlaylistThumbView(data []byte) (string, error) {
+	return renderAlbumArtThumb(data, thumbArtColumns, thumbArtRows)
 }
 
 func renderAlbumArtViews(data []byte, kitty bool) (string, string, error) {

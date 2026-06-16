@@ -841,6 +841,11 @@ func (m Model) renderSearchContent(width int) string {
 	lines = append(lines, labelStyle.Render(m.config.SearchService+" / "+m.searchCategory))
 	lines = append(lines, renderSearchField(query, contentWidth, placeholder, m.mode == modeSearch))
 
+	if carousel := m.renderPlaylistCarousel(contentWidth); carousel != "" {
+		lines = append(lines, "")
+		lines = append(lines, carousel)
+	}
+
 	if m.searchPreviewQuery != "" && m.searchPreviewQuery != m.searchQuery {
 		lines = append(lines, subtitleStyle.Render("updating results for "+displayText(m.searchQuery, max(10, contentWidth-22))))
 	} else if m.searchPreviewQuery != "" {
@@ -848,11 +853,17 @@ func (m Model) renderSearchContent(width int) string {
 	}
 
 	if len(m.searchItems) == 0 {
-		lines = append(lines, "")
-		lines = append(lines, hintStyle.Render("Search results will appear here"))
+		if !m.hasCarouselPreview() {
+			lines = append(lines, "")
+			lines = append(lines, hintStyle.Render("Search results will appear here"))
+		}
 	} else {
-		limit := min(len(m.searchItems), 8)
-		for i := 0; i < limit; i++ {
+		if m.searchOffset > 0 {
+			lines = append(lines, subtitleStyle.Render(fmt.Sprintf("+%d above", m.searchOffset)))
+		}
+		start := clamp(m.searchOffset, 0, max(0, len(m.searchItems)-1))
+		end := min(len(m.searchItems), start+m.searchVisibleRows())
+		for i := start; i < end; i++ {
 			item := m.searchItems[i]
 			row := fmt.Sprintf("%2d  %-9s  %s", i+1, truncate(item.Item.ItemType, 9), displayText(item.Title(), max(8, contentWidth-18)))
 			if i == m.searchIndex {
@@ -862,8 +873,8 @@ func (m Model) renderSearchContent(width int) string {
 			}
 			lines = append(lines, row)
 		}
-		if len(m.searchItems) > limit {
-			lines = append(lines, subtitleStyle.Render(fmt.Sprintf("+%d more", len(m.searchItems)-limit)))
+		if remaining := len(m.searchItems) - end; remaining > 0 {
+			lines = append(lines, subtitleStyle.Render(fmt.Sprintf("+%d more", remaining)))
 		}
 	}
 
@@ -873,9 +884,22 @@ func (m Model) renderSearchContent(width int) string {
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, hintStyle.Render("enter play  ctrl+t tracks  ctrl+p playlists  esc close"))
+	lines = append(lines, hintStyle.Render(m.searchHint()))
 
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) hasCarouselPreview() bool {
+	return m.playlistCarouselVisible() &&
+		m.searchFocus == searchFocusCarousel &&
+		(m.searchPreviewItemID != "" || m.searchPreviewLoading || len(m.searchPreviewItems) > 0)
+}
+
+func (m Model) searchHint() string {
+	if m.playlistCarouselVisible() {
+		return "left/right cards tabs  up/down list  enter play  ctrl+f pin/unpin  ctrl+t  ctrl+p  esc"
+	}
+	return "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
 }
 
 func renderSearchField(query string, width int, placeholder bool, cursorVisible bool) string {
@@ -903,6 +927,159 @@ func renderSearchField(query string, width int, placeholder bool, cursorVisible 
 		Width(max(16, width-4)).
 		Render("> " + display)
 	return field
+}
+
+func (m Model) renderPlaylistCarousel(width int) string {
+	tabs := m.playlistCarouselTabs()
+	if len(tabs) == 0 {
+		return ""
+	}
+	tabIndex := clamp(m.carouselTab, 0, len(tabs)-1)
+	var labels []string
+	for i, tab := range tabs {
+		label := tab.Label
+		if i == tabIndex {
+			label = accentStyle.Render(label)
+		} else {
+			label = subtitleStyle.Render(label)
+		}
+		labels = append(labels, label)
+	}
+	header := lipgloss.JoinHorizontal(lipgloss.Center, labelsWithSeparator(labels, subtitleStyle.Render(" | "))...)
+	if m.carouselLoading {
+		header = lipgloss.JoinHorizontal(lipgloss.Center, header, paneSpace(1), spinnerStyle.Render(m.spinner()))
+	}
+
+	items := tabs[tabIndex].Items
+	if len(items) == 0 {
+		return header
+	}
+	count := min(len(items), carouselCardCount(width))
+	cardGap := 1
+	cardWidth := max(12, (width-cardGap*(count-1))/count)
+	cardWidth = min(cardWidth, 18)
+	start := 0
+	if m.carouselIndex >= count {
+		start = m.carouselIndex - count + 1
+	}
+	if start+count > len(items) {
+		start = max(0, len(items)-count)
+	}
+	cards := make([]string, 0, count*2)
+	for i := 0; i < count; i++ {
+		index := start + i
+		if i > 0 {
+			cards = append(cards, paneSpace(cardGap))
+		}
+		selected := m.searchFocus == searchFocusCarousel && index == m.carouselIndex
+		artURL := playlistArtworkURL(items[index])
+		thumb := ""
+		if m.carouselThumbViews != nil {
+			thumb = m.carouselThumbViews[artURL]
+		}
+		cards = append(cards, renderPlaylistCarouselCard(items[index], cardWidth, selected, thumb))
+	}
+	strip := lipgloss.JoinHorizontal(lipgloss.Top, cards...)
+	return strings.Join([]string{header, strip}, "\n")
+}
+
+func labelsWithSeparator(labels []string, separator string) []string {
+	if len(labels) <= 1 {
+		return labels
+	}
+	out := make([]string, 0, len(labels)*2-1)
+	for i, label := range labels {
+		if i > 0 {
+			out = append(out, separator)
+		}
+		out = append(out, label)
+	}
+	return out
+}
+
+func carouselCardCount(width int) int {
+	switch {
+	case width >= 72:
+		return 6
+	case width >= 60:
+		return 5
+	case width >= 48:
+		return 4
+	default:
+		return 3
+	}
+}
+
+func renderPlaylistCarouselCard(result SearchResult, width int, selected bool, thumb string) string {
+	titleWidth := max(6, width-2)
+	cover := renderPlaylistCarouselCover(result, thumb)
+	title := titleStyle.Width(titleWidth).Render(displayText(result.Title(), titleWidth))
+	source := strings.TrimSpace(result.Item.Summary)
+	if source == "" {
+		source = strings.TrimSpace(result.Item.Creator)
+	}
+	if source == "" {
+		source = strings.TrimSpace(result.Item.ItemType)
+	}
+	summary := subtitleStyle.Width(titleWidth).Render(displayText(source, titleWidth))
+	style := lipgloss.NewStyle().
+		Width(width).
+		Height(6).
+		Padding(0, 1).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(colorPanelHi).
+		Background(colorPanel)
+	if selected {
+		style = style.BorderForeground(colorSelected)
+	}
+	return style.Render(lipgloss.JoinVertical(lipgloss.Left, cover, title, summary))
+}
+
+func renderPlaylistCarouselCover(result SearchResult, thumb string) string {
+	if strings.TrimSpace(thumb) != "" {
+		return thumb
+	}
+	initials := playlistInitials(result.Title())
+	initialView := lipgloss.NewStyle().
+		Width(thumbArtColumns).
+		Align(lipgloss.Center).
+		Bold(true).
+		Foreground(colorPanel).
+		Background(colorAccent2).
+		Render(displayText(initials, thumbArtColumns))
+	return lipgloss.Place(
+		thumbArtColumns,
+		thumbArtRows,
+		lipgloss.Center,
+		lipgloss.Center,
+		initialView,
+		lipgloss.WithWhitespaceBackground(colorAccent2),
+	)
+}
+
+func playlistInitials(title string) string {
+	words := strings.Fields(title)
+	if len(words) == 0 {
+		return "PL"
+	}
+	var b strings.Builder
+	count := 0
+	for _, word := range words {
+		r, _ := utf8.DecodeRuneInString(word)
+		if r == utf8.RuneError {
+			continue
+		}
+		b.WriteRune(r)
+		count++
+		if count >= 2 {
+			break
+		}
+	}
+	initials := strings.ToUpper(b.String())
+	if initials == "" {
+		return "PL"
+	}
+	return initials
 }
 
 func selectedLine(value string, width int) string {
@@ -1011,7 +1188,7 @@ func (m Model) renderFooterContent(width int) string {
 		keys = layoutHint + "  left/right 5s  o options  / search"
 	}
 	if m.mode == modeSearch {
-		keys = "enter play  ctrl+t tracks  ctrl+p playlists  esc close"
+		keys = m.searchHint()
 	} else if m.mode == modePlaybackConfig {
 		keys = "space toggle  esc close"
 	} else if m.dashboardFocus == focusQueue {
@@ -1071,6 +1248,18 @@ func footerKeys(value string, width int) string {
 	case "enter play  ctrl+t tracks  ctrl+p playlists  esc close":
 		choices = append(choices,
 			"enter play  ctrl+t  ctrl+p  esc",
+			"enter  esc",
+		)
+	case "left/right cards tabs  up/down list  enter play  ctrl+f pin/unpin  ctrl+t  ctrl+p  esc":
+		choices = append(choices,
+			"left/right tabs  up/down list  enter  ctrl+f pin  esc",
+			"left/right  up/down  enter  ctrl+f  esc",
+			"enter  esc",
+		)
+	case "enter play  space pin  ctrl+t tracks  ctrl+p playlists  esc close":
+		choices = append(choices,
+			"enter play  space pin  ctrl+t  ctrl+p  esc",
+			"enter  space  ctrl+p  esc",
 			"enter  esc",
 		)
 	case "space toggle  esc close":

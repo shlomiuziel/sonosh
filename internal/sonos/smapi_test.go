@@ -222,12 +222,15 @@ func TestSMAPI_GetMetadata_Success(t *testing.T) {
           <id>spotify:playlist:pl123</id>
           <itemType>playlist</itemType>
           <title>My Playlist</title>
+          <creator>Spotify</creator>
+          <albumArtURI>https://example.test/playlist.jpg</albumArtURI>
         </mediaCollection>
         <mediaMetadata>
           <id>spotify:track:abc</id>
           <itemType>track</itemType>
           <title>Track Title</title>
           <mimeType>audio/x-spotify</mimeType>
+          <artworkURI>https://example.test/track.jpg</artworkURI>
         </mediaMetadata>
       </getMetadataResult>
     </getMetadataResponse>
@@ -265,8 +268,17 @@ func TestSMAPI_GetMetadata_Success(t *testing.T) {
 	if len(res.MediaCollection) != 1 || res.MediaCollection[0].ID != "spotify:playlist:pl123" {
 		t.Fatalf("unexpected mediaCollection: %#v", res.MediaCollection)
 	}
+	if res.MediaCollection[0].AlbumArtURI != "https://example.test/playlist.jpg" || res.MediaCollection[0].ArtworkURI != "https://example.test/playlist.jpg" {
+		t.Fatalf("unexpected playlist artwork fields: %#v", res.MediaCollection[0])
+	}
+	if res.MediaCollection[0].Creator != "Spotify" {
+		t.Fatalf("unexpected playlist creator: %#v", res.MediaCollection[0])
+	}
 	if len(res.MediaMetadata) != 1 || res.MediaMetadata[0].ID != "spotify:track:abc" {
 		t.Fatalf("unexpected mediaMetadata: %#v", res.MediaMetadata)
+	}
+	if res.MediaMetadata[0].ArtworkURI != "https://example.test/track.jpg" {
+		t.Fatalf("unexpected track artwork URI: %#v", res.MediaMetadata[0])
 	}
 	if !strings.Contains(seenBody, "<token>T1</token>") || !strings.Contains(seenBody, "<key>K1</key>") {
 		t.Fatalf("request missing credentials header: %s", seenBody)

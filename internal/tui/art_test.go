@@ -39,6 +39,30 @@ func TestRenderAlbumArtThumb(t *testing.T) {
 	}
 }
 
+func TestRenderPlaylistThumbViewUsesBlockArt(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 128, A: 255})
+		}
+	}
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+
+	view, err := renderPlaylistThumbView(buf.Bytes())
+	if err != nil {
+		t.Fatalf("render playlist thumb: %v", err)
+	}
+	if strings.Contains(view, "\x1b_G") {
+		t.Fatalf("playlist thumb should not use kitty graphics:\n%s", view)
+	}
+	if !strings.Contains(view, "▀") {
+		t.Fatalf("playlist thumb missing block glyphs:\n%s", view)
+	}
+}
+
 func TestStatusMessageLoadsAlbumArt(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
 	for y := 0; y < 4; y++ {
