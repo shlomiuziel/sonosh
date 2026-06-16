@@ -22,6 +22,8 @@ type visualTheme struct {
 	Cover    lipgloss.Color
 }
 
+const terminalCanvasColor lipgloss.Color = "#2B2B2B"
+
 var visualThemes = []visualTheme{
 	{
 		Name:     "aurora",
@@ -131,7 +133,7 @@ func applyTheme(name string) string {
 	activeThemeName = visualThemes[index].Name
 	theme := visualThemes[index]
 
-	colorBase = theme.Panel
+	colorBase = terminalCanvasColor
 	colorInk = theme.Ink
 	colorMuted = theme.Muted
 	colorSubtle = theme.Subtle
