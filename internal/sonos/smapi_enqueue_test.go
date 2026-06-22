@@ -118,6 +118,12 @@ func TestSMAPIEnqueueHelpers(t *testing.T) {
 	if got := smapiEnqueuedURI("0fffffffPLAYLIST%3A42", "playlist", "23"); got != "x-rincon-cpcontainer:0fffffffPLAYLIST%3A42" {
 		t.Fatalf("playlist enqueued URI = %q", got)
 	}
+	if got := smapiEnqueuedURI("0fffffffYOUR_SONGS", "trackList", "23"); got != "x-rincon-cpcontainer:0fffffffYOUR_SONGS" {
+		t.Fatalf("trackList enqueued URI = %q", got)
+	}
+	if got := smapiEnqueuedURI("0fffffffYOUR_ALBUMS", "albumList", "23"); got != "x-rincon-cpcontainer:0fffffffYOUR_ALBUMS" {
+		t.Fatalf("albumList enqueued URI = %q", got)
+	}
 	if got := smapiServiceDesc(MusicServiceDescriptor{ID: "5"}); got != "SA_RINCON1287_" {
 		t.Fatalf("service desc = %q", got)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -71,7 +72,6 @@ type Model struct {
 	carouselGeneration      int
 	carouselPinned          []SearchResult
 	carouselRecent          []SearchResult
-	carouselMadeForYou      []SearchResult
 	carouselTab             int
 	carouselIndex           int
 	carouselThumbViews      map[string]string
@@ -185,7 +185,6 @@ type playlistCarouselMsg struct {
 	store      playlistCarouselStore
 	pinned     []SearchResult
 	recent     []SearchResult
-	madeForYou []SearchResult
 	err        error
 }
 
@@ -450,7 +449,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.carouselStore = normalizePlaylistCarouselStore(msg.store)
 		m.carouselPinned = msg.pinned
 		m.carouselRecent = msg.recent
-		m.carouselMadeForYou = msg.madeForYou
 		m.clampCarouselSelection()
 		cmds = append(cmds, m.playlistThumbCmds()...)
 		if err := SavePlaylistCarouselStore(m.config.CarouselPath, m.carouselStore); err != nil {
@@ -1053,9 +1051,6 @@ func (m Model) playlistCarouselTabs() []playlistCarouselTab {
 	if len(m.carouselRecent) > 0 {
 		tabs = append(tabs, playlistCarouselTab{ID: "recent", Label: "Recent", Items: m.carouselRecent})
 	}
-	if len(m.carouselMadeForYou) > 0 {
-		tabs = append(tabs, playlistCarouselTab{ID: "made_for_you", Label: "Made For You", Items: m.carouselMadeForYou})
-	}
 	return tabs
 }
 
@@ -1182,7 +1177,7 @@ func (m *Model) toggleSelectedPlaylistPin() (bool, bool) {
 }
 
 func (m *Model) recordRecentPlaylist(result SearchResult) {
-	if !isPlaylistResult(result) {
+	if !isRecentEligibleCarouselResult(result) {
 		return
 	}
 	// Invalidate any in-flight carousel refresh so it can't overwrite local recent updates.
@@ -1218,13 +1213,17 @@ func (m Model) playlistThumbCmds() []tea.Cmd {
 
 func (m Model) selectedPinnablePlaylistResult() (SearchResult, bool) {
 	if m.playlistCarouselVisible() && m.searchFocus == searchFocusCarousel {
-		return m.selectedCarouselResult()
+		result, ok := m.selectedCarouselResult()
+		if !ok || !isPinnableCarouselResult(result) {
+			return SearchResult{}, false
+		}
+		return result, true
 	}
 	if m.searchFocus != searchFocusResults || len(m.searchItems) == 0 || m.searchIndex < 0 || m.searchIndex >= len(m.searchItems) {
 		return SearchResult{}, false
 	}
 	result := m.searchItems[m.searchIndex]
-	if !isPlaylistResult(result) {
+	if !isPinnableCarouselResult(result) {
 		return SearchResult{}, false
 	}
 	return result, true
@@ -1535,7 +1534,7 @@ func playSearchCmd(backend Backend, cfg Config, room Room, result SearchResult) 
 		return actionMsg{
 			message:        "playing " + result.Title(),
 			err:            err,
-			playlistPlayed: isPlaylistResult(result),
+			playlistPlayed: isRecentEligibleCarouselResult(result),
 			playedPlaylist: result,
 		}
 	}
@@ -1556,6 +1555,16 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 		defer cancel()
 
 		store = normalizePlaylistCarouselStore(store)
+		shouldSeedDefaults := !store.DefaultPinsSeeded && !hasCustomizedPlaylistPins(store)
+		slog.Debug("playlist carousel: load start",
+			"generation", generation,
+			"room", room.Name,
+			"service", cfg.SearchService,
+			"pins", len(store.Pins),
+			"recent", len(store.Recent),
+			"defaultPinsSeeded", store.DefaultPinsSeeded,
+			"shouldSeedDefaults", shouldSeedDefaults,
+		)
 		pinned := playlistCarouselPinnedResults(store)
 		nextPins := make([]playlistCarouselStoreItem, 0, len(store.Pins))
 		var firstErr error
@@ -1566,6 +1575,12 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 			}
 			current := playlistCarouselResultFromStoreItem(pin)
 			needsResolve := strings.TrimSpace(pin.ID) == "" || playlistArtworkURL(current) == "" || isReleaseRadarTitle(title)
+			slog.Debug("playlist carousel: inspect pin",
+				"title", title,
+				"id", pin.ID,
+				"creator", pin.Creator,
+				"needsResolve", needsResolve,
+			)
 			if !needsResolve {
 				nextPins = append(nextPins, pin)
 				continue
@@ -1579,6 +1594,12 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 				ok = false
 			}
 			if err == nil && ok {
+				slog.Debug("playlist carousel: resolved pin",
+					"title", title,
+					"resolvedTitle", result.Title(),
+					"resolvedID", result.Item.ID,
+					"resolvedCreator", result.Item.Creator,
+				)
 				pin = playlistCarouselStoreItemFromResult(result)
 				pinned[i] = result
 				nextPins = append(nextPins, pin)
@@ -1588,6 +1609,11 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 				firstErr = err
 			}
 			if err != nil {
+				slog.Debug("playlist carousel: pin resolve failed",
+					"title", title,
+					"id", pin.ID,
+					"err", err.Error(),
+				)
 				if isReleaseRadarTitle(title) && strings.TrimSpace(pin.ID) != "" && !isSpotifyReleaseRadarResult(current) {
 					continue
 				}
@@ -1595,8 +1621,14 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 				continue
 			}
 			if isReleaseRadarTitle(title) {
+				slog.Debug("playlist carousel: dropping unresolved release radar")
 				continue
 			}
+			slog.Debug("playlist carousel: keeping unresolved pin",
+				"title", title,
+				"id", pin.ID,
+				"creator", pin.Creator,
+			)
 			if strings.TrimSpace(pin.ID) != "" {
 				if strings.TrimSpace(pin.ArtworkURI) == "" && strings.TrimSpace(pin.AlbumArtURI) != "" {
 					pin.ArtworkURI = pin.AlbumArtURI
@@ -1607,76 +1639,198 @@ func playlistCarouselCmd(backend Backend, cfg Config, room Room, store playlistC
 		store.Pins = nextPins
 		pinned = playlistCarouselPinnedResults(store)
 
-		madeForYou, err := discoverMadeForYouPlaylists(ctx, backend, cfg, room, playlistShelfLimit)
-		if err != nil && firstErr == nil {
-			firstErr = err
+		defaultPins, seedErr := discoverDefaultPinnedPlaylists(ctx, backend, cfg, room)
+		if seedErr != nil && firstErr == nil {
+			firstErr = seedErr
 		}
+		if shouldSeedDefaults && seedErr == nil {
+			store = seedDefaultPlaylistPins(store, defaultPins)
+			store.DefaultPinsSeeded = true
+			pinned = playlistCarouselPinnedResults(store)
+			slog.Debug("playlist carousel: seeded default pins",
+				"pinnedCount", len(pinned),
+				"popularCount", len(defaultPins.PopularPlaylists),
+				"likedSongsFound", isSpotifyLikedSongsResult(defaultPins.LikedSongs),
+			)
+		} else if !store.DefaultPinsSeeded && seedErr == nil {
+			store.DefaultPinsSeeded = true
+			slog.Debug("playlist carousel: marked defaults seeded without changes")
+		}
+		slog.Debug("playlist carousel: load complete",
+			"generation", generation,
+			"pinnedCount", len(pinned),
+			"recentCount", len(store.Recent),
+			"err", debugErrString(firstErr),
+		)
 
 		return playlistCarouselMsg{
 			generation: generation,
 			store:      store,
 			pinned:     pinned,
 			recent:     playlistCarouselRecentResults(store),
-			madeForYou: madeForYou,
 			err:        firstErr,
 		}
 	}
 }
 
-func discoverMadeForYouPlaylists(ctx context.Context, backend Backend, cfg Config, room Room, limit int) ([]SearchResult, error) {
+type defaultPinnedPlaylists struct {
+	PopularPlaylists []SearchResult
+	LikedSongs       SearchResult
+}
+
+func discoverDefaultPinnedPlaylists(ctx context.Context, backend Backend, cfg Config, room Room) (defaultPinnedPlaylists, error) {
 	root, err := backend.PlaylistShelf(ctx, room, cfg.SearchService, "root", 24)
 	if err != nil {
-		return nil, err
+		slog.Debug("playlist carousel: default pin root shelf fetch failed",
+			"room", room.Name,
+			"service", cfg.SearchService,
+			"err", err.Error(),
+		)
+		return defaultPinnedPlaylists{}, err
 	}
-	var out []SearchResult
+	var out defaultPinnedPlaylists
 	var firstErr error
 	for _, shelf := range root {
-		if !madeForYouShelfTitle(shelf.Title()) {
+		kind := defaultPinShelfKind(shelf.Title())
+		slog.Debug("playlist carousel: inspect default pin shelf",
+			"title", shelf.Title(),
+			"id", shelf.Item.ID,
+			"itemType", shelf.Item.ItemType,
+			"kind", kind,
+		)
+		if kind == "" {
 			continue
 		}
-		if isPlaylistResult(shelf) {
-			out = append(out, shelf)
-			continue
-		}
-		id := strings.TrimSpace(shelf.Item.ID)
-		if id == "" {
-			continue
-		}
-		items, err := backend.PlaylistShelf(ctx, room, cfg.SearchService, id, limit)
+		items, err := backend.PlaylistShelf(ctx, room, cfg.SearchService, strings.TrimSpace(shelf.Item.ID), playlistShelfLimit)
 		if err != nil {
+			slog.Debug("playlist carousel: default pin child shelf fetch failed",
+				"title", shelf.Title(),
+				"id", shelf.Item.ID,
+				"kind", kind,
+				"err", err.Error(),
+			)
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
-		for _, item := range items {
-			if isPlaylistResult(item) {
-				out = append(out, item)
+		rawItems := items
+		items = filterDefaultPinShelfItems(kind, rawItems, playlistShelfLimit)
+		slog.Debug("playlist carousel: default pin child shelf items",
+			"title", shelf.Title(),
+			"id", shelf.Item.ID,
+			"kind", kind,
+			"count", len(items),
+			"titles", searchResultTitles(items),
+			"rawCount", len(rawItems),
+			"rawTitles", searchResultTitles(rawItems),
+		)
+		switch kind {
+		case "popular-playlists":
+			out.PopularPlaylists = items
+		case "your-music":
+			if len(items) > 0 {
+				out.LikedSongs = items[0]
 			}
 		}
 	}
-	out = dedupePlaylistResults(out, limit)
 	return out, firstErr
 }
 
-func madeForYouShelfTitle(title string) bool {
+func defaultPinShelfKind(title string) string {
 	normalized := strings.ToLower(strings.TrimSpace(title))
-	if normalized == "" {
-		return false
+	switch normalized {
+	case "popular playlists":
+		return "popular-playlists"
+	case "your music":
+		return "your-music"
+	default:
+		return ""
 	}
-	labels := []string{
-		"made for you",
-		"jump back in",
-		"your top mixes",
-		"recently played",
-		"your mixes",
+}
+
+func seedDefaultPlaylistPins(store playlistCarouselStore, shelves defaultPinnedPlaylists) playlistCarouselStore {
+	addDefaultPin := func(result SearchResult) {
+		item := playlistCarouselStoreItemFromResult(result)
+		if item.Title == "" && item.ID == "" {
+			return
+		}
+		store.Pins = append(store.Pins, item)
+		store = normalizePlaylistCarouselStore(store)
+		slog.Debug("playlist carousel: seeded pin",
+			"title", result.Title(),
+			"id", result.Item.ID,
+			"creator", result.Item.Creator,
+		)
 	}
-	for _, label := range labels {
-		if strings.Contains(normalized, label) {
+	if len(shelves.PopularPlaylists) > 0 {
+		addDefaultPin(shelves.PopularPlaylists[0])
+	} else {
+		slog.Debug("playlist carousel: no popular playlists candidates found")
+	}
+	if isSpotifyLikedSongsResult(shelves.LikedSongs) {
+		addDefaultPin(shelves.LikedSongs)
+	} else {
+		slog.Debug("playlist carousel: no liked songs candidate found")
+	}
+	return normalizePlaylistCarouselStore(store)
+}
+
+func hasCustomizedPlaylistPins(store playlistCarouselStore) bool {
+	pins := normalizePlaylistCarouselItems(store.Pins, 0)
+	for _, pin := range pins {
+		title := strings.TrimSpace(pin.Title)
+		if !isReleaseRadarTitle(title) {
+			return true
+		}
+		if strings.TrimSpace(pin.ID) != "" {
 			return true
 		}
 	}
-	return strings.HasPrefix(normalized, "made for ")
+	return false
+}
+
+func searchResultTitles(items []SearchResult) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.Title())
+	}
+	return out
+}
+
+func filterPlaylistResults(items []SearchResult, limit int) []SearchResult {
+	out := make([]SearchResult, 0, len(items))
+	for _, item := range items {
+		if !isPlaylistResult(item) {
+			continue
+		}
+		out = append(out, item)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func filterDefaultPinShelfItems(kind string, items []SearchResult, limit int) []SearchResult {
+	switch kind {
+	case "popular-playlists":
+		return filterPlaylistResults(items, limit)
+	case "your-music":
+		for _, item := range items {
+			if isSpotifyLikedSongsResult(item) {
+				return []SearchResult{item}
+			}
+		}
+	}
+	return nil
+}
+
+func debugErrString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func dedupePlaylistResults(items []SearchResult, limit int) []SearchResult {
@@ -1709,6 +1863,27 @@ func searchResultKey(result SearchResult) string {
 func isPlaylistResult(result SearchResult) bool {
 	itemType := strings.ToLower(strings.TrimSpace(result.Item.ItemType))
 	return itemType == "playlist" || strings.Contains(itemType, "playlist")
+}
+
+func isSpotifyLikedSongsResult(result SearchResult) bool {
+	if strings.EqualFold(strings.TrimSpace(result.Item.ID), "your_songs") {
+		return true
+	}
+	title := strings.ToLower(strings.TrimSpace(result.Item.Title))
+	itemType := strings.ToLower(strings.TrimSpace(result.Item.ItemType))
+	return title == "songs" && itemType == "tracklist"
+}
+
+func isPinnableCarouselResult(result SearchResult) bool {
+	return isPlaylistResult(result) || isSpotifyLikedSongsResult(result)
+}
+
+func isBrowsableCarouselResult(result SearchResult) bool {
+	return isPlaylistResult(result) || isSpotifyLikedSongsResult(result)
+}
+
+func isRecentEligibleCarouselResult(result SearchResult) bool {
+	return isPlaylistResult(result) || isSpotifyLikedSongsResult(result)
 }
 
 func sameSearchResultID(a, b SearchResult) bool {

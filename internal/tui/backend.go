@@ -524,7 +524,7 @@ func (b *SonosBackend) ResolvePinnedPlaylist(ctx context.Context, room Room, ser
 }
 
 func (b *SonosBackend) BrowsePlaylist(ctx context.Context, room Room, serviceName string, result SearchResult, limit int) ([]SearchResult, error) {
-	if !isPlaylistResult(result) {
+	if !isBrowsableCarouselResult(result) {
 		return nil, nil
 	}
 

@@ -72,7 +72,7 @@ func smapiDIDLItemID(itemID string) string {
 func smapiEnqueuedURI(didlItemID, itemType, serviceID string) string {
 	sid := url.QueryEscape(serviceID)
 	switch strings.ToLower(strings.TrimSpace(itemType)) {
-	case "album", "artist", "container", "playlist":
+	case "album", "albumlist", "artist", "container", "playlist", "tracklist":
 		return "x-rincon-cpcontainer:" + didlItemID
 	default:
 		return fmt.Sprintf("soco://%s?sid=%s&sn=0", escapeSMAPIItemID(didlItemID), sid)

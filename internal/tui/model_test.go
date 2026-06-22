@@ -669,6 +669,85 @@ func TestPlaylistCarouselKeepsOnlySpotifyReleaseRadar(t *testing.T) {
 	}
 }
 
+func TestPlaylistCarouselSeedsDefaultPopularPlaylistsAndLikedSongs(t *testing.T) {
+	backend := &fakeBackend{
+		shelfFn: func(shelfID string) []SearchResult {
+			switch shelfID {
+			case "root":
+				return []SearchResult{
+					{Item: sonos.SMAPIItem{ID: "spotify:shelf:popular", ItemType: "container", Title: "Popular Playlists"}},
+					{Item: sonos.SMAPIItem{ID: "spotify:shelf:yourmusic", ItemType: "container", Title: "Your Music"}},
+				}
+			case "spotify:shelf:popular":
+				return []SearchResult{
+					{Item: sonos.SMAPIItem{ID: "spotify:playlist:popular-one", ItemType: "playlist", Title: "Popular One", Creator: "Spotify", ArtworkURI: "https://example.test/popular.jpg"}},
+				}
+			case "spotify:shelf:yourmusic":
+				return []SearchResult{
+					{Item: sonos.SMAPIItem{ID: "your_songs", ItemType: "trackList", Title: "Songs", Creator: "Spotify", ArtworkURI: "https://example.test/yourmusic.jpg"}},
+				}
+			default:
+				return nil
+			}
+		},
+		resolveFn: func(title string) (SearchResult, bool) {
+			if title != "Release Radar" {
+				return SearchResult{}, false
+			}
+			return SearchResult{Item: sonos.SMAPIItem{
+				ID:         "spotify:playlist:release-radar",
+				ItemType:   "playlist",
+				Title:      "Release Radar",
+				Creator:    "Spotify",
+				ArtworkURI: "https://example.test/release-radar.jpg",
+			}}, true
+		},
+	}
+	model := NewModel(backend, testConfig())
+
+	msg := runCmd(playlistCarouselCmd(backend, testConfig(), Room{Name: "Kitchen", IP: "192.0.2.10"}, model.carouselStore, 1)).(playlistCarouselMsg)
+	if !msg.store.DefaultPinsSeeded {
+		t.Fatalf("default pins were not marked seeded: %#v", msg.store)
+	}
+	if len(msg.pinned) != 3 {
+		t.Fatalf("pins = %#v, want release radar + popular playlists + liked songs", msg.pinned)
+	}
+	if got := []string{msg.pinned[0].Title(), msg.pinned[1].Title(), msg.pinned[2].Title()}; strings.Join(got, ",") != "Release Radar,Popular One,Liked Songs" {
+		t.Fatalf("seeded pin order = %v", got)
+	}
+}
+
+func TestPlaylistCarouselDoesNotSeedDefaultsAfterUserCustomization(t *testing.T) {
+	store := playlistCarouselStore{
+		Pins: []playlistCarouselStoreItem{
+			{ID: "spotify:playlist:custom", ItemType: "playlist", Title: "My Custom Playlist"},
+		},
+	}
+	backend := &fakeBackend{
+		shelfFn: func(shelfID string) []SearchResult {
+			if shelfID == "root" {
+				return []SearchResult{
+					{Item: sonos.SMAPIItem{ID: "spotify:shelf:popular", ItemType: "container", Title: "Popular Playlists"}},
+				}
+			}
+			if shelfID == "spotify:shelf:popular" {
+				return []SearchResult{
+					{Item: sonos.SMAPIItem{ID: "spotify:playlist:popular-one", ItemType: "playlist", Title: "Popular One", Creator: "Spotify"}},
+				}
+			}
+			return nil
+		},
+	}
+
+	msg := runCmd(playlistCarouselCmd(backend, testConfig(), Room{Name: "Kitchen", IP: "192.0.2.10"}, store, 1)).(playlistCarouselMsg)
+	if len(msg.pinned) != 1 || msg.pinned[0].Title() != "My Custom Playlist" {
+		t.Fatalf("custom pins were modified: %#v", msg.pinned)
+	}
+	if !msg.store.DefaultPinsSeeded {
+		t.Fatalf("customized store should still be marked seeded: %#v", msg.store)
+	}
+}
+
 func TestPlaylistCarouselDropsRandomReleaseRadar(t *testing.T) {
 	store := defaultPlaylistCarouselStore()
 	store.Pins[0] = playlistCarouselStoreItem{
@@ -747,6 +826,53 @@ func TestPlaylistCarouselPinAndRecentPersistence(t *testing.T) {
 	}
 	if len(store.Recent) < 2 || store.Recent[0].ID != "spotify:playlist:a" || store.Recent[1].ID != "spotify:playlist:b" {
 		t.Fatalf("recent MRU order = %#v", store.Recent)
+	}
+}
+
+func TestPlaylistCarouselLikedSongsPinAndRecentPersistence(t *testing.T) {
+	dir := t.TempDir()
+	cfg := testConfig()
+	cfg.CarouselPath = filepath.Join(dir, "playlist_carousel.json")
+	model := NewModel(&fakeBackend{}, cfg)
+	model.rooms = []Room{{Name: "Kitchen", IP: "192.0.2.10"}}
+	model.mode = modeSearch
+	model.searchCategory = "playlists"
+	model.searchFocus = searchFocusCarousel
+	likedSongs := SearchResult{Item: sonos.SMAPIItem{ID: "your_songs", ItemType: "trackList", Title: "Songs", Creator: "Spotify"}}
+	model.carouselRecent = []SearchResult{likedSongs}
+	model.carouselTab = 1
+
+	updated, _ := model.Update(key(" "))
+	model = updated.(Model)
+	if model.carouselTab != 0 || len(model.carouselPinned) == 0 || model.carouselPinned[model.carouselIndex].Item.ID != "your_songs" {
+		t.Fatalf("pinning liked songs did not switch to pinned tab: tab=%d index=%d pins=%#v", model.carouselTab, model.carouselIndex, model.carouselPinned)
+	}
+	store, err := LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore: %v", err)
+	}
+	if !storeHasPlaylist(store.Pins, "your_songs") {
+		t.Fatalf("liked songs was not persisted: %#v", store.Pins)
+	}
+	normalizedLikedSongs := false
+	for _, pin := range store.Pins {
+		if pin.ID == "your_songs" && pin.Title == "Liked Songs" {
+			normalizedLikedSongs = true
+			break
+		}
+	}
+	if !normalizedLikedSongs {
+		t.Fatalf("liked songs title was not normalized: %#v", store.Pins)
+	}
+
+	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: likedSongs})
+	model = updated.(Model)
+	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
+	if err != nil {
+		t.Fatalf("LoadPlaylistCarouselStore recent: %v", err)
+	}
+	if len(store.Recent) == 0 || store.Recent[0].ID != "your_songs" || store.Recent[0].Title != "Liked Songs" {
+		t.Fatalf("liked songs recent persistence = %#v", store.Recent)
 	}
 }
 

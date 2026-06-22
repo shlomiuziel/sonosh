@@ -17,14 +17,16 @@ const (
 )
 
 type playlistCarouselStore struct {
-	Pins   []playlistCarouselStoreItem
-	Recent []playlistCarouselStoreItem
+	Pins              []playlistCarouselStoreItem
+	Recent            []playlistCarouselStoreItem
+	DefaultPinsSeeded bool
 }
 
 type playlistCarouselConfigFile struct {
-	Version int                         `json:"version"`
-	Pins    []playlistCarouselStoreItem `json:"pins,omitempty"`
-	Recent  []playlistCarouselStoreItem `json:"recent,omitempty"`
+	Version           int                         `json:"version"`
+	Pins              []playlistCarouselStoreItem `json:"pins,omitempty"`
+	Recent            []playlistCarouselStoreItem `json:"recent,omitempty"`
+	DefaultPinsSeeded bool                        `json:"defaultPinsSeeded,omitempty"`
 }
 
 type playlistCarouselStoreItem struct {
@@ -62,7 +64,11 @@ func LoadPlaylistCarouselStore(path string) (playlistCarouselStore, error) {
 	if err := json.Unmarshal(raw, &ff); err != nil {
 		return playlistCarouselStore{}, fmt.Errorf("parse playlist carousel config: %w", err)
 	}
-	return normalizePlaylistCarouselStore(playlistCarouselStore{Pins: ff.Pins, Recent: ff.Recent}), nil
+	return normalizePlaylistCarouselStore(playlistCarouselStore{
+		Pins:              ff.Pins,
+		Recent:            ff.Recent,
+		DefaultPinsSeeded: ff.DefaultPinsSeeded,
+	}), nil
 }
 
 func SavePlaylistCarouselStore(path string, store playlistCarouselStore) error {
@@ -75,9 +81,10 @@ func SavePlaylistCarouselStore(path string, store playlistCarouselStore) error {
 	}
 	store = normalizePlaylistCarouselStore(store)
 	ff := playlistCarouselConfigFile{
-		Version: playlistCarouselStoreVersion,
-		Pins:    store.Pins,
-		Recent:  store.Recent,
+		Version:           playlistCarouselStoreVersion,
+		Pins:              store.Pins,
+		Recent:            store.Recent,
+		DefaultPinsSeeded: store.DefaultPinsSeeded,
 	}
 	data, err := json.MarshalIndent(ff, "", "  ")
 	if err != nil {
@@ -110,9 +117,6 @@ func normalizePlaylistCarouselItems(items []playlistCarouselStoreItem, limit int
 	for _, item := range items {
 		item = normalizePlaylistCarouselItem(item)
 		if item.Title == "" && item.ID == "" {
-			continue
-		}
-		if isLikedSongsTitle(item.Title) {
 			continue
 		}
 		key := playlistCarouselStoreKey(item)
@@ -168,6 +172,12 @@ func playlistCarouselResultFromStoreItem(item playlistCarouselStoreItem) SearchR
 }
 
 func playlistCarouselStoreItemFromResult(result SearchResult) playlistCarouselStoreItem {
+	if isSpotifyLikedSongsResult(result) {
+		result.Item.Title = "Liked Songs"
+		if strings.TrimSpace(result.Item.Creator) == "" {
+			result.Item.Creator = "Spotify"
+		}
+	}
 	return normalizePlaylistCarouselItem(playlistCarouselStoreItem{
 		ID:          result.Item.ID,
 		ItemType:    result.Item.ItemType,

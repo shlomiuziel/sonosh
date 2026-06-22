@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,7 +44,14 @@ func main() {
 	limit := flag.Int("limit", 10, "SMAPI search result limit")
 	theme := flag.String("theme", defaultTheme, "visual theme (aurora, sunset, electric, midnight; cycle in the TUI with ctrl+v)")
 	macHelperPath := flag.String("mac-helper-path", "", "path to sonosh-macos-helper (macOS only; defaults to SONOSH_MAC_HELPER or executable sibling)")
+	debugLog := flag.Bool("debug-log", false, "Append debug logs to ~/Library/Application Support/sonosh/debug.log")
 	flag.Parse()
+
+	if *debugLog {
+		if err := enableFileDebugLogging(); err != nil {
+			fmt.Fprintf(os.Stderr, "sonosh: debug log setup failed: %v\n", err)
+		}
+	}
 
 	cfg := tui.Config{
 		Timeout:          normalizeTimeout(*timeout),
@@ -73,4 +82,22 @@ func normalizeTimeout(timeout time.Duration) time.Duration {
 		return sonos.DefaultTimeout
 	}
 	return timeout
+}
+
+func enableFileDebugLogging() error {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "sonosh", "debug.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	slog.Debug("sonosh: debug logging enabled", "path", path)
+	return nil
 }
