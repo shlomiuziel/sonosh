@@ -627,6 +627,28 @@ func TestPlaylistCarouselRendersOnlyInPlaylistMode(t *testing.T) {
 	}
 }
 
+func TestPlaylistCarouselRecentFitsSearchPane(t *testing.T) {
+	model := NewModel(&fakeBackend{}, Config{})
+	model.searchCategory = "playlists"
+	model.carouselRecent = []SearchResult{
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:one", ItemType: "playlist", Title: "Playlist One"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:two", ItemType: "playlist", Title: "Playlist Two"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:three", ItemType: "playlist", Title: "Playlist Three"}},
+		{Item: sonos.SMAPIItem{ID: "spotify:playlist:four", ItemType: "playlist", Title: "Playlist Four"}},
+	}
+
+	const width = 48
+	view := model.renderPlaylistCarousel(width)
+	if strings.Contains(view, "Playlist Four") {
+		t.Fatalf("recent carousel rendered more than three visible cards:\n%s", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if got := lipgloss.Width(line); got > width {
+			t.Fatalf("playlist carousel line width = %d, want <= %d:\n%s", got, width, view)
+		}
+	}
+}
+
 func TestPlaylistCarouselResolvesDefaultPinsWithFallback(t *testing.T) {
 	backend := &fakeBackend{}
 	model := NewModel(backend, testConfig())

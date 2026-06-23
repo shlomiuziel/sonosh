@@ -954,7 +954,7 @@ func (m Model) renderPlaylistCarousel(width int) string {
 	if len(items) == 0 {
 		return header
 	}
-	count := min(len(items), carouselCardCount(width))
+	count := min(len(items), carouselCardCount(width, tabIndex))
 	cardGap := 1
 	cardWidth := max(12, (width-cardGap*(count-1))/count)
 	cardWidth = min(cardWidth, 18)
@@ -997,17 +997,21 @@ func labelsWithSeparator(labels []string, separator string) []string {
 	return out
 }
 
-func carouselCardCount(width int) int {
-	switch {
-	case width >= 72:
-		return 6
-	case width >= 60:
-		return 5
-	case width >= 48:
-		return 4
-	default:
-		return 3
+func carouselCardCount(width, tabIndex int) int {
+	const (
+		maxCards     = 6
+		maxRecent    = 3
+		minCardWidth = 12
+		cardGap      = 2
+	)
+	if width < minCardWidth {
+		return 1
 	}
+	count := max(1, min(maxCards, (width+cardGap)/(minCardWidth+cardGap)))
+	if tabIndex == 1 {
+		count = min(count, maxRecent)
+	}
+	return count
 }
 
 func renderPlaylistCarouselCard(result SearchResult, width int, selected bool, thumb string) string {
