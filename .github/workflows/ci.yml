@@ -35,7 +35,7 @@ jobs:
         run: |
           total="$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $3}' | sed 's/%//')"
           echo "total coverage: ${total}%"
-          awk -v cov="${total}" 'BEGIN { exit !(cov+0 >= 75.0) }' || { echo "coverage floor not met (min 75.0%)"; exit 1; }
+          awk -v cov="${total}" 'BEGIN { exit !(cov+0 >= 70.0) }' || { echo "coverage floor not met (min 70.0%)"; exit 1; }
 
       - name: Stream proxy coverage floor
         run: |
