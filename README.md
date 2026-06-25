@@ -2,6 +2,37 @@
 
 ![sonosh demo](docs/assets/sonosh-demo.gif)
 
+## sonosh TUI
+
+`sonosh` is the keyboard-driven terminal UI in this repo: a Go application for
+discovering Sonos speakers, selecting a room, and controlling playback without
+leaving the terminal. The `sonos` CLI and shared backend it builds on are still
+in this repository, but they are described separately below so the TUI-specific
+feature set is clear.
+
+- **Room-aware dashboard**: discover speakers and groups, pick the active room,
+  and keep live now-playing, transport, volume, mute, and playback-mode state
+  in one screen.
+- **Keyboard-first playback control**: play, pause, stop, next, previous,
+  volume up/down, mute toggle, and short scrubbing jumps directly from the UI.
+- **Playback-mode controls**: inspect and toggle shuffle, repeat, and
+  crossfade without dropping to a separate command.
+- **Queue management**: open a live queue pane, page through entries, play a
+  specific position, remove items, move entries, and clear the queue.
+- **Spotify / SMAPI search**: search tracks or playlists from Sonos music
+  services, preview playlist contents, and start playback from search results.
+- **Playlist carousel**: keep pinned playlist shortcuts plus recent playlist
+  results in a persistent carousel, with artwork preserved in the UI.
+- **Album-art rendering**: show cover art inline in the player pane with
+  terminal-friendly fallbacks when richer rendering is unavailable.
+- **Adaptive layouts and themes**: switch visual themes, use a compact layout
+  on narrower terminals, and persist those preferences across launches.
+- **Optional macOS media bridge**: `sonosh` can launch the Swift helper in
+  `helpers/macos/sonosh-helper`, publish now-playing metadata to the system
+  media layer, and bind hardware or Control Center play/pause, toggle, next,
+  and previous commands back into the app over a local Unix-socket JSON
+  protocol.
+
 `sonosh` is a Go terminal UI for discovering and controlling Sonos speakers on
 your local network. It is fork-derived from
 [`steipete/sonoscli`](https://github.com/steipete/sonoscli), keeping the mature
@@ -18,7 +49,10 @@ The inherited `sonos` CLI is still available while the TUI grows.
 
 `sonoscli` is a modern Go CLI to control Sonos speakers over your local network (UPnP/SOAP).
 
-## Features
+## sonoscli Lineage
+
+The sections from here down describe the inherited `sonos` CLI surface and the
+shared Sonos backend capabilities that `sonosh` builds on.
 
 - **Reliable discovery**: SSDP + topology (`ZoneGroupTopology.GetZoneGroupState`) with subnet scan fallback.
 - **Coordinator-aware control**: target any room; commands go to the group coordinator automatically.
@@ -93,6 +127,13 @@ Build the TUI locally:
 ```bash
 go build -o sonosh ./cmd/sonosh
 ./sonosh
+```
+
+Build the optional macOS media helper:
+
+```bash
+swift build --package-path helpers/macos/sonosh-helper
+./sonosh --mac-helper-path helpers/macos/sonosh-helper/.build/debug/sonosh-macos-helper
 ```
 
 Build the inherited CLI locally:
