@@ -1,5 +1,7 @@
 # sonosh - Sonos TUI and CLI
 
+![sonosh demo](docs/assets/sonosh-demo.gif)
+
 `sonosh` is a Go terminal UI for discovering and controlling Sonos speakers on
 your local network. It is fork-derived from
 [`steipete/sonoscli`](https://github.com/steipete/sonoscli), keeping the mature
