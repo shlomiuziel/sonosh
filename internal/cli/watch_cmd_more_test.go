@@ -211,6 +211,15 @@ func TestWatchCmd_PlainParseError(t *testing.T) {
 	req, _ := http.NewRequest("NOTIFY", callbackURL, strings.NewReader("<e:propertyset"))
 	req.Header.Set("SID", "uuid:avt")
 	req.Header.Set("SEQ", "1")
+	deadline := time.After(1 * time.Second)
+	for !strings.Contains(out.String(), "Watching events") {
+		select {
+		case <-deadline:
+			t.Fatalf("watch did not become ready: %q", out.String())
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("notify: %v", err)
