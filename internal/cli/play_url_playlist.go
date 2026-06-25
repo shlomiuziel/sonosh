@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
 	"github.com/shlomiuziel/sonosh/internal/streamproxy"
+	"github.com/spf13/cobra"
 )
 
 type playlistTrack struct {

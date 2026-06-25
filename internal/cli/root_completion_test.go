@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/spf13/cobra"
 )
 
 func TestNameFlagCompletion_ReturnsSortedUniqueAndFiltersByPrefix(t *testing.T) {
