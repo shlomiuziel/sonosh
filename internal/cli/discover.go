@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/spf13/cobra"
 )
 
 var discoverFunc = sonos.Discover

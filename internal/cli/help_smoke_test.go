@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/appconfig"
+	"github.com/spf13/cobra"
 )
 
 func TestHelpWorksForAllCommands(t *testing.T) {

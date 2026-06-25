@@ -3,8 +3,8 @@ package cli
 import (
 	"errors"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/spf13/cobra"
 )
 
 func newOpenCmd(flags *rootFlags) *cobra.Command {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/appconfig"
+	"github.com/spf13/cobra"
 )
 
 var newConfigStore = func() (appconfig.Store, error) { return appconfig.NewDefaultStore() }

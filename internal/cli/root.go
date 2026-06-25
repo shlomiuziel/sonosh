@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/appconfig"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/spf13/cobra"
 )
 
 type rootFlags struct {

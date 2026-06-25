@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
 	"github.com/shlomiuziel/sonosh/internal/spotify"
+	"github.com/spf13/cobra"
 )
 
 type spotifySearcher interface {

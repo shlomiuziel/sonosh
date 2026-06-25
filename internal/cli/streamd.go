@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/streamproxy"
+	"github.com/spf13/cobra"
 )
 
 func newStreamDaemonCmd(flags *rootFlags) *cobra.Command {

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"github.com/shlomiuziel/sonosh/internal/sonos"
+	"github.com/spf13/cobra"
 )
 
 type queueClient interface {
