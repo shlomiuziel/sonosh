@@ -65,7 +65,7 @@ jobs:
 
   build-helper-amd64:
     needs: release
-    runs-on: macos-13
+    runs-on: macos-14
     outputs:
       asset_url: ${{ steps.meta.outputs.asset_url }}
       sha256: ${{ steps.checksum.outputs.sha256 }}
@@ -78,7 +78,7 @@ jobs:
         working-directory: helpers/macos/sonosh-helper
         run: |
           set -euo pipefail
-          swift build --package-path . --configuration release --disable-sandbox
+          swift build --package-path . --configuration release --disable-sandbox --triple x86_64-apple-macosx13.0
           staging="$(mktemp -d)"
           cp .build/release/sonosh-macos-helper "$staging/sonosh-macos-helper"
           tarball="$RUNNER_TEMP/sonosh-helper-darwin-amd64.tar.gz"
