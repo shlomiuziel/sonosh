@@ -49,6 +49,7 @@ func TestWatchCmdValidatesTarget(t *testing.T) {
 func TestWatchCmdEmitsJSONEvent(t *testing.T) {
 	// Fake Sonos speaker that accepts SUBSCRIBE and records callback URL.
 	callbackCh := make(chan string, 1)
+	subscribedCh := make(chan struct{}, 2)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -64,6 +65,10 @@ func TestWatchCmdEmitsJSONEvent(t *testing.T) {
 			w.Header().Set("TIMEOUT", "Second-1800")
 			w.WriteHeader(http.StatusOK)
 			select {
+			case subscribedCh <- struct{}{}:
+			default:
+			}
+			select {
 			case callbackCh <- cb:
 			default:
 			}
@@ -72,6 +77,10 @@ func TestWatchCmdEmitsJSONEvent(t *testing.T) {
 			w.Header().Set("SID", "uuid:rc")
 			w.Header().Set("TIMEOUT", "Second-1800")
 			w.WriteHeader(http.StatusOK)
+			select {
+			case subscribedCh <- struct{}{}:
+			default:
+			}
 			return
 		case r.Method == "UNSUBSCRIBE":
 			w.WriteHeader(http.StatusOK)
@@ -115,6 +124,13 @@ func TestWatchCmdEmitsJSONEvent(t *testing.T) {
 	case callbackURL = <-callbackCh:
 	case <-time.After(1 * time.Second):
 		t.Fatalf("timed out waiting for subscribe callback")
+	}
+	for range 2 {
+		select {
+		case <-subscribedCh:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timed out waiting for subscribe responses")
+		}
 	}
 
 	// Emit a NOTIFY event to the callback server.
