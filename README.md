@@ -117,6 +117,12 @@ Upgrade later:
 brew upgrade shlomiuziel/sonosh/sonosh
 ```
 
+First-time Spotify setup:
+
+- If you want Spotify / SMAPI search in `sonosh`, use the inherited `sonos` CLI: `sonos auth smapi begin --service "Spotify"` and finish the DeviceLink/AppLink flow.
+- Use `sonos config set defaultRoom "<Room Name>"` and `sonos config set defaultTimeout 20s` if you want sticky defaults for the TUI and CLI.
+- See [`docs/commands/sonos-auth-smapi.md`](docs/commands/sonos-auth-smapi.md) and [`docs/commands/sonos-config.md`](docs/commands/sonos-config.md) for the full command details.
+
 Install from source (Go):
 
 ```bash
