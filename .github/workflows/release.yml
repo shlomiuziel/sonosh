@@ -30,8 +30,77 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  update-homebrew-tap:
+  build-helper-arm64:
     needs: release
+    runs-on: macos-14
+    outputs:
+      asset_url: ${{ steps.meta.outputs.asset_url }}
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Build helper asset
+        working-directory: helpers/macos/sonosh-helper
+        run: |
+          set -euo pipefail
+          swift build --package-path . --configuration release --disable-sandbox
+          staging="$(mktemp -d)"
+          cp .build/release/sonosh-macos-helper "$staging/sonosh-macos-helper"
+          tarball="$RUNNER_TEMP/sonosh-helper-darwin-arm64.tar.gz"
+          tar -C "$staging" -czf "$tarball" sonosh-macos-helper
+          shasum -a 256 "$tarball" | awk '{print $1}' > "$RUNNER_TEMP/sonosh-helper-darwin-arm64.sha256"
+
+      - id: meta
+        run: echo "asset_url=https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/sonosh-helper-darwin-arm64.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - id: checksum
+        run: echo "sha256=$(cat \"$RUNNER_TEMP/sonosh-helper-darwin-arm64.sha256\")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload helper asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" "$RUNNER_TEMP/sonosh-helper-darwin-arm64.tar.gz" --clobber
+
+  build-helper-amd64:
+    needs: release
+    runs-on: macos-13
+    outputs:
+      asset_url: ${{ steps.meta.outputs.asset_url }}
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Build helper asset
+        working-directory: helpers/macos/sonosh-helper
+        run: |
+          set -euo pipefail
+          swift build --package-path . --configuration release --disable-sandbox
+          staging="$(mktemp -d)"
+          cp .build/release/sonosh-macos-helper "$staging/sonosh-macos-helper"
+          tarball="$RUNNER_TEMP/sonosh-helper-darwin-amd64.tar.gz"
+          tar -C "$staging" -czf "$tarball" sonosh-macos-helper
+          shasum -a 256 "$tarball" | awk '{print $1}' > "$RUNNER_TEMP/sonosh-helper-darwin-amd64.sha256"
+
+      - id: meta
+        run: echo "asset_url=https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/sonosh-helper-darwin-amd64.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - id: checksum
+        run: echo "sha256=$(cat \"$RUNNER_TEMP/sonosh-helper-darwin-amd64.sha256\")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload helper asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" "$RUNNER_TEMP/sonosh-helper-darwin-amd64.tar.gz" --clobber
+
+  update-homebrew-tap:
+    needs:
+      - release
+      - build-helper-arm64
+      - build-helper-amd64
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch tap update
@@ -47,5 +116,9 @@ jobs:
               inputs: {
                 repository: 'shlomiuziel/sonosh',
                 tag: '${{ inputs.tag }}',
+                helper_arm64_url: '${{ needs.build-helper-arm64.outputs.asset_url }}',
+                helper_arm64_sha256: '${{ needs.build-helper-arm64.outputs.sha256 }}',
+                helper_amd64_url: '${{ needs.build-helper-amd64.outputs.asset_url }}',
+                helper_amd64_sha256: '${{ needs.build-helper-amd64.outputs.sha256 }}',
               },
             })
