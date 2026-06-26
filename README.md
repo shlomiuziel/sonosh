@@ -104,8 +104,7 @@ Smart URL streaming:
 Install (Homebrew, single line):
 
 ```bash
-brew tap shlomiuziel/sonosh
-brew install --HEAD shlomiuziel/sonosh/sonosh
+brew install shlomiuziel/sonosh/sonosh
 ```
 
 This installs the `sonosh` command globally. On macOS, the formula also builds
@@ -115,7 +114,7 @@ and now-playing metadata keep working without extra setup.
 Upgrade later:
 
 ```bash
-brew upgrade --HEAD shlomiuziel/sonosh/sonosh
+brew upgrade shlomiuziel/sonosh/sonosh
 ```
 
 Install from source (Go):

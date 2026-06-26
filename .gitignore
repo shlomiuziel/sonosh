@@ -25,6 +25,7 @@ yarn-error.log*
 /sonos.exe
 /bin/
 /dist/
+homebrew-sonosh/
 /build/
 /out/
 /tmp/
