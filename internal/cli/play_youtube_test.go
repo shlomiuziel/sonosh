@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -178,9 +177,7 @@ cat <<'JSON'
 {"title":"Video Title","url":"https://rr.example/audio.m4a","webpage_url":"https://www.youtube.com/watch?v=abc","format_id":"140","ext":"m4a","acodec":"mp4a.40.2"}
 JSON
 `
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatalf("write fake yt-dlp: %v", err)
-	}
+	writeExecutableFile(t, path, []byte(script))
 
 	stream, err := (ytDLPResolver{path: path}).Resolve(context.Background(), "https://www.youtube.com/watch?v=abc", youtubeResolveOptions{})
 	if err != nil {

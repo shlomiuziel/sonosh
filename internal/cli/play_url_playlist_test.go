@@ -254,9 +254,7 @@ func TestEnumerateYTDLPPlaylistReturnsErrorWhenYTDLPFails(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "yt-dlp")
 	script := "#!/bin/sh\necho 'ERROR: invalid url' 1>&2\nexit 1\n"
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatalf("write fake: %v", err)
-	}
+	writeExecutableFile(t, path, []byte(script))
 
 	_, err := enumerateYTDLPPlaylist(context.Background(), path, "https://example.com/x", 0)
 	if err == nil {
@@ -269,8 +267,35 @@ func writeFakeYTDLPPlaylist(t *testing.T, output string) string {
 
 	path := filepath.Join(t.TempDir(), "yt-dlp")
 	script := "#!/bin/sh\ncat <<'EOF'\n" + output + "EOF\n"
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatalf("write fake yt-dlp: %v", err)
-	}
+	writeExecutableFile(t, path, []byte(script))
 	return path
+}
+
+func writeExecutableFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		t.Fatalf("create temp executable: %v", err)
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		_ = os.Remove(tmpName)
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		t.Fatalf("write temp executable: %v", err)
+	}
+	if err := tmp.Chmod(0o700); err != nil {
+		_ = tmp.Close()
+		t.Fatalf("chmod temp executable: %v", err)
+	}
+	if err := tmp.Close(); err != nil {
+		t.Fatalf("close temp executable: %v", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		t.Fatalf("move temp executable into place: %v", err)
+	}
 }
