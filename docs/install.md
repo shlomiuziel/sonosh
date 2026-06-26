@@ -1,22 +1,23 @@
 ---
 title: Install
-description: Install sonoscli via Homebrew, go install, prebuilt release archives, or from source.
+description: Install sonosh via Homebrew, go install, prebuilt release archives, or from source.
 ---
 
 # Install
 
-`sonoscli` ships a single binary called `sonos`. Pick whichever install option suits your machine.
+`sonosh` ships a global `sonosh` command and the inherited `sonos` CLI. Pick whichever install option suits your machine.
 
 ## Homebrew (recommended on macOS / Linux)
 
 ```bash
-brew install steipete/tap/sonoscli
+brew tap shlomiuziel/sonosh
+brew install --HEAD shlomiuziel/sonosh/sonosh
 ```
 
 Upgrade later:
 
 ```bash
-brew upgrade steipete/tap/sonoscli
+brew upgrade --HEAD shlomiuziel/sonosh/sonosh
 ```
 
 ## go install
@@ -24,8 +25,8 @@ brew upgrade steipete/tap/sonoscli
 If you already have a Go toolchain (Go 1.22+):
 
 ```bash
-go install github.com/shlomiuziel/sonosh/cmd/sonos@latest
-sonos --version
+go install github.com/shlomiuziel/sonosh/cmd/sonosh@latest
+sonosh
 ```
 
 The binary lands in `$(go env GOBIN)` (defaults to `$HOME/go/bin`) — make sure that's on your `PATH`.
@@ -42,7 +43,7 @@ Use this when you want the current `main` branch before the next release:
 git clone https://github.com/shlomiuziel/sonosh
 cd sonosh
 make build
-./bin/sonos --version
+./bin/sonosh --version
 ```
 
 `sonos play-url` needs `ffmpeg`, and uses `yt-dlp` for YouTube, YouTube Music playlists, SoundCloud-style pages, and other media pages:
@@ -55,7 +56,7 @@ brew install ffmpeg yt-dlp
 
 - Your machine must be on the same network as your Sonos system.
 - Speakers must be reachable on TCP port `1400` (e.g. `http://<speaker-ip>:1400/`). Test with `curl -s http://<speaker-ip>:1400/xml/device_description.xml | head`.
-- Multicast / SSDP (`239.255.255.250:1900`) helps discovery but is not required — `sonoscli` falls back to a subnet scan.
+- Multicast / SSDP (`239.255.255.250:1900`) helps discovery but is not required — `sonosh` falls back to a subnet scan.
 - For [`sonos watch`](commands/sonos-watch.md), Sonos has to reach *your* machine on a callback port; your firewall may prompt the first time.
 
 ## Shell completion

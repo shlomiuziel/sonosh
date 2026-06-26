@@ -104,15 +104,18 @@ Smart URL streaming:
 Install (Homebrew, single line):
 
 ```bash
-brew install steipete/tap/sonoscli
+brew tap shlomiuziel/sonosh
+brew install --HEAD shlomiuziel/sonosh/sonosh
 ```
 
-This installs the `sonos` binary.
+This installs the `sonosh` command globally. On macOS, the formula also builds
+the Swift media helper and wires it up automatically so playback control keys
+and now-playing metadata keep working without extra setup.
 
 Upgrade later:
 
 ```bash
-brew upgrade steipete/tap/sonoscli
+brew upgrade --HEAD shlomiuziel/sonosh/sonosh
 ```
 
 Install from source (Go):
@@ -132,8 +135,8 @@ go build -o sonosh ./cmd/sonosh
 Build the optional macOS media helper:
 
 ```bash
-swift build --package-path helpers/macos/sonosh-helper
-./sonosh --mac-helper-path helpers/macos/sonosh-helper/.build/debug/sonosh-macos-helper
+swift build --package-path helpers/macos/sonosh-helper --configuration release
+./sonosh --mac-helper-path helpers/macos/sonosh-helper/.build/release/sonosh-macos-helper
 ```
 
 Build the inherited CLI locally:
