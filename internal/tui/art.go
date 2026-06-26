@@ -33,7 +33,7 @@ func fetchAlbumArtCmd(url string, kitty bool) tea.Cmd {
 		if err != nil {
 			return albumArtMsg{url: url, err: err}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return albumArtMsg{url: url, err: fmt.Errorf("album art fetch returned %s", resp.Status)}
 		}
@@ -57,7 +57,7 @@ func fetchPlaylistThumbCmd(url string) tea.Cmd {
 		if err != nil {
 			return playlistThumbMsg{url: url, err: err}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return playlistThumbMsg{url: url, err: fmt.Errorf("playlist art fetch returned %s", resp.Status)}
 		}
@@ -88,7 +88,7 @@ func renderAlbumArtViews(data []byte, kitty bool) (string, string, error) {
 	}
 	fallback, err := renderAlbumArtBlocks(data, albumArtColumns, albumArtRows)
 	if err != nil {
-		return view, "", nil
+		return view, "", err
 	}
 	return view, fallback, nil
 }
@@ -186,10 +186,10 @@ func sampleRGBA(img image.Image, bounds image.Rectangle, x, y, width, height int
 func rgbaAt(img image.Image, x, y int) color.RGBA {
 	r, g, b, a := img.At(x, y).RGBA()
 	return color.RGBA{
-		R: uint8(r >> 8),
-		G: uint8(g >> 8),
-		B: uint8(b >> 8),
-		A: uint8(a >> 8),
+		R: uint8((r >> 8) & 0xff),
+		G: uint8((g >> 8) & 0xff),
+		B: uint8((b >> 8) & 0xff),
+		A: uint8((a >> 8) & 0xff),
 	}
 }
 

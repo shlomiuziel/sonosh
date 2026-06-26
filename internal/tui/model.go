@@ -90,9 +90,11 @@ type Model struct {
 	height int
 }
 
-type mode int
-type dashboardFocus int
-type searchFocus int
+type (
+	mode           int
+	dashboardFocus int
+	searchFocus    int
+)
 
 const (
 	modeDashboard mode = iota
@@ -1351,7 +1353,7 @@ func (m Model) handleMacHelperCommand(command string) (tea.Model, tea.Cmd) {
 		m.message = "No Sonos room selected"
 		return m, nil
 	}
-	action := ""
+	var action string
 	switch strings.TrimSpace(command) {
 	case "play":
 		action = "play"
@@ -1833,6 +1835,7 @@ func debugErrString(err error) string {
 	return err.Error()
 }
 
+//nolint:unused
 func dedupePlaylistResults(items []SearchResult, limit int) []SearchResult {
 	out := make([]SearchResult, 0, len(items))
 	seen := map[string]bool{}
@@ -1850,6 +1853,7 @@ func dedupePlaylistResults(items []SearchResult, limit int) []SearchResult {
 	return out
 }
 
+//nolint:unused
 func searchResultKey(result SearchResult) string {
 	if id := strings.ToLower(strings.TrimSpace(result.Item.ID)); id != "" {
 		return "id:" + id
@@ -1896,6 +1900,7 @@ func isReleaseRadarTitle(title string) bool {
 	return strings.EqualFold(strings.TrimSpace(title), "Release Radar")
 }
 
+//nolint:unused
 func isLikedSongsTitle(title string) bool {
 	return strings.EqualFold(strings.TrimSpace(title), "Liked Songs")
 }

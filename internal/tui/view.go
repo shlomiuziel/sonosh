@@ -226,7 +226,7 @@ func (m Model) renderCompactRooms(width int) string {
 
 func (m Model) renderQueue(width int) string {
 	contentWidth := max(1, width-borderChrome)
-	style := panelStyle.Copy()
+	style := panelStyle
 	if m.dashboardFocus == focusQueue {
 		style = style.BorderForeground(colorSelected)
 	}
@@ -1131,7 +1131,7 @@ func compactRoomRow(name string, width int, selected bool) string {
 }
 
 func compactSidebarStyle() lipgloss.Style {
-	return panelStyle.Copy().
+	return panelStyle.
 		BorderForeground(colorPanelHi).
 		Padding(0, 1)
 }

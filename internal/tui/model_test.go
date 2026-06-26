@@ -146,8 +146,7 @@ func TestDashboardKeysDispatchActions(t *testing.T) {
 		t.Fatalf("seek inputs = %q / %q", backend.seekPosition, backend.seekDuration)
 	}
 
-	updated, cmd = model.Update(key("left"))
-	model = updated.(Model)
+	_, cmd = model.Update(key("left"))
 	if cmd == nil {
 		t.Fatal("expected seek command")
 	}
@@ -217,8 +216,7 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 		t.Fatalf("playbackConfigIndex = %d, want 1", model.playbackConfigIndex)
 	}
 
-	updated, cmd = model.Update(key("enter"))
-	model = updated.(Model)
+	_, cmd = model.Update(key("enter"))
 	if cmd == nil {
 		t.Fatal("expected shuffle toggle command")
 	}
@@ -266,8 +264,7 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 		t.Fatal("expected status refresh after repeat toggle")
 	}
 
-	updated, cmd = model.Update(key("enter"))
-	model = updated.(Model)
+	_, cmd = model.Update(key("enter"))
 	if cmd == nil {
 		t.Fatal("expected repeat toggle command")
 	}
@@ -397,8 +394,7 @@ func TestSearchKeysSearchAndPlay(t *testing.T) {
 		t.Fatalf("search items = %d, want 1", len(model.searchItems))
 	}
 
-	updated, cmd = model.Update(key("enter"))
-	model = updated.(Model)
+	_, cmd = model.Update(key("enter"))
 	if cmd == nil {
 		t.Fatal("expected play command")
 	}
@@ -622,7 +618,7 @@ func TestPlaylistCarouselRendersOnlyInPlaylistMode(t *testing.T) {
 	if pinnedAt < 0 {
 		t.Fatalf("playlist carousel missing:\n%s", playlistView)
 	}
-	if !(fieldAt >= 0 && pinnedAt > fieldAt && placeholderAt > pinnedAt) {
+	if fieldAt < 0 || pinnedAt <= fieldAt || placeholderAt <= pinnedAt {
 		t.Fatalf("carousel not between search field and result placeholder:\n%s", playlistView)
 	}
 }
@@ -836,12 +832,11 @@ func TestPlaylistCarouselPinAndRecentPersistence(t *testing.T) {
 
 	playlistA := SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:a", ItemType: "playlist", Title: "Playlist A"}}
 	playlistB := SearchResult{Item: sonos.SMAPIItem{ID: "spotify:playlist:b", ItemType: "playlist", Title: "Playlist B"}}
-	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
+	_, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
 	model = updated.(Model)
 	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistB})
 	model = updated.(Model)
-	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
-	model = updated.(Model)
+	_, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: playlistA})
 	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
 	if err != nil {
 		t.Fatalf("LoadPlaylistCarouselStore recent: %v", err)
@@ -887,8 +882,7 @@ func TestPlaylistCarouselLikedSongsPinAndRecentPersistence(t *testing.T) {
 		t.Fatalf("liked songs title was not normalized: %#v", store.Pins)
 	}
 
-	updated, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: likedSongs})
-	model = updated.(Model)
+	_, _ = model.Update(actionMsg{playlistPlayed: true, playedPlaylist: likedSongs})
 	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
 	if err != nil {
 		t.Fatalf("LoadPlaylistCarouselStore recent: %v", err)
@@ -967,8 +961,7 @@ func TestPlaylistSearchResultPinAndUnpinWithP(t *testing.T) {
 
 	model.searchFocus = searchFocusCarousel
 	model.carouselIndex = 0
-	updated, _ = model.Update(key("ctrl+f"))
-	model = updated.(Model)
+	_, _ = model.Update(key("ctrl+f"))
 	store, err = LoadPlaylistCarouselStore(cfg.CarouselPath)
 	if err != nil {
 		t.Fatalf("LoadPlaylistCarouselStore after unpin: %v", err)
@@ -998,8 +991,7 @@ func TestPlaylistSearchResultPinStartsThumbFetchImmediately(t *testing.T) {
 		}},
 	}
 
-	updated, cmd := model.Update(key("ctrl+f"))
-	model = updated.(Model)
+	_, cmd := model.Update(key("ctrl+f"))
 	if cmd == nil {
 		t.Fatal("expected pin command batch")
 	}
@@ -1160,8 +1152,7 @@ func TestMacHelperCommandDispatchesTransport(t *testing.T) {
 	}
 
 	model.status.State = "PAUSED_PLAYBACK"
-	updated, cmd = model.handleMacHelperCommand("togglePlayPause")
-	model = updated.(Model)
+	_, cmd = model.handleMacHelperCommand("togglePlayPause")
 	if cmd == nil {
 		t.Fatal("expected transport command")
 	}
@@ -1681,8 +1672,7 @@ func TestQueueFocusDispatchesActions(t *testing.T) {
 		t.Fatalf("move = %d -> %d, want 1 -> 2", backend.moveFrom, backend.moveTo)
 	}
 
-	updated, cmd = model.Update(key("X"))
-	model = updated.(Model)
+	_, cmd = model.Update(key("X"))
 	if cmd == nil {
 		t.Fatal("expected queue clear command")
 	}

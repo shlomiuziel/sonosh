@@ -27,6 +27,7 @@ func LoadThemeName(path string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
+	// #nosec G304 -- path comes from app-controlled config location.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

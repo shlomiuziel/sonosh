@@ -113,12 +113,13 @@ var (
 	trackStyle    lipgloss.Style
 	hintStyle     lipgloss.Style
 	errorStyle    lipgloss.Style
-	messageStyle  lipgloss.Style
 	spinnerStyle  lipgloss.Style
 )
 
-var activeThemeIndex int
-var activeThemeName string
+var (
+	activeThemeIndex int
+	activeThemeName  string
+)
 
 func init() {
 	applyTheme(visualThemes[0].Name)
@@ -155,7 +156,7 @@ func applyTheme(name string) string {
 		Background(colorPanel).
 		Padding(0, 2)
 
-	sidebarStyle = panelStyle.Copy().
+	sidebarStyle = panelStyle.
 		BorderForeground(colorPanelHi).
 		Padding(1, 1)
 
@@ -204,10 +205,6 @@ func applyTheme(name string) string {
 		Foreground(colorError).
 		Background(colorPanel).
 		Bold(true)
-
-	messageStyle = lipgloss.NewStyle().
-		Foreground(colorWarn).
-		Background(colorPanel)
 
 	spinnerStyle = lipgloss.NewStyle().
 		Foreground(colorAccent2).

@@ -53,6 +53,7 @@ func LoadPlaylistCarouselStore(path string) (playlistCarouselStore, error) {
 	if path == "" {
 		return defaultPlaylistCarouselStore(), nil
 	}
+	// #nosec G304 -- path comes from app-controlled config location.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

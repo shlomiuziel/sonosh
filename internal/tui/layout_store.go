@@ -27,6 +27,7 @@ func LoadCompactLayout(path string) (bool, error) {
 	if path == "" {
 		return false, nil
 	}
+	// #nosec G304 -- path comes from app-controlled config location.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

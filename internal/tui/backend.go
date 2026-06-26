@@ -111,6 +111,7 @@ func (b *SonosBackend) Discover(ctx context.Context) ([]Room, error) {
 
 	top, err := sonos.NewClient(devices[0].IP, b.Timeout).GetTopology(ctx)
 	if err != nil {
+		//nolint:nilerr // Fall back to direct device listing when topology fetch is unavailable.
 		return roomsFromDevices(devices), nil
 	}
 
