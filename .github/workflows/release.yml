@@ -104,21 +104,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch tap update
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: 'shlomiuziel',
-              repo: 'homebrew-tap',
-              workflow_id: 'update-formula.yml',
-              ref: 'main',
-              inputs: {
-                repository: 'shlomiuziel/sonosh',
-                tag: '${{ inputs.tag }}',
-                helper_arm64_url: '${{ needs.build-helper-arm64.outputs.asset_url }}',
-                helper_arm64_sha256: '${{ needs.build-helper-arm64.outputs.sha256 }}',
-                helper_amd64_url: '${{ needs.build-helper-amd64.outputs.asset_url }}',
-                helper_amd64_sha256: '${{ needs.build-helper-amd64.outputs.sha256 }}',
-              },
-            })
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          REPOSITORY: shlomiuziel/sonosh
+          TAG: ${{ inputs.tag }}
+          HELPER_ARM64_URL: https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/sonosh-helper-darwin-arm64.tar.gz
+          HELPER_AMD64_URL: https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}/sonosh-helper-darwin-amd64.tar.gz
+        run: |
+          set -euo pipefail
+
+          arm64_tarball="$(mktemp)"
+          amd64_tarball="$(mktemp)"
+
+          curl -fsSL "$HELPER_ARM64_URL" -o "$arm64_tarball"
+          curl -fsSL "$HELPER_AMD64_URL" -o "$amd64_tarball"
+
+          helper_arm64_sha256="$(shasum -a 256 "$arm64_tarball" | awk '{print $1}')"
+          helper_amd64_sha256="$(shasum -a 256 "$amd64_tarball" | awk '{print $1}')"
+
+          gh workflow run update-formula.yml \
+            --repo shlomiuziel/homebrew-tap \
+            --ref main \
+            -f repository="$REPOSITORY" \
+            -f tag="$TAG" \
+            -f helper_arm64_url="$HELPER_ARM64_URL" \
+            -f helper_arm64_sha256="$helper_arm64_sha256" \
+            -f helper_amd64_url="$HELPER_AMD64_URL" \
+            -f helper_amd64_sha256="$helper_amd64_sha256"
