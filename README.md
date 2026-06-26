@@ -104,7 +104,7 @@ Smart URL streaming:
 Install (Homebrew, single line):
 
 ```bash
-brew install shlomiuziel/sonosh/sonosh
+brew install shlomiuziel/tap/sonosh
 ```
 
 This installs the `sonosh` command globally. On macOS, the formula also builds
@@ -114,7 +114,7 @@ and now-playing metadata keep working without extra setup.
 Upgrade later:
 
 ```bash
-brew upgrade shlomiuziel/sonosh/sonosh
+brew upgrade shlomiuziel/tap/sonosh
 ```
 
 First-time Spotify setup:

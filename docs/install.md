@@ -10,13 +10,13 @@ description: Install sonosh via Homebrew, go install, prebuilt release archives,
 ## Homebrew (recommended on macOS / Linux)
 
 ```bash
-brew install shlomiuziel/sonosh/sonosh
+brew install shlomiuziel/tap/sonosh
 ```
 
 Upgrade later:
 
 ```bash
-brew upgrade shlomiuziel/sonosh/sonosh
+brew upgrade shlomiuziel/tap/sonosh
 ```
 
 ## go install
