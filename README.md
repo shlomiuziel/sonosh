@@ -1,107 +1,26 @@
-# sonosh - Sonos TUI and CLI
+# sonosh
 
-![sonosh demo](docs/assets/sonosh-demo.gif)
+sonosh is a keyboard-driven terminal UI for Sonos.
 
-## sonosh TUI
+It keeps the most common controls close to the keyboard: switch rooms, browse the queue, inspect what is playing, and trigger playback without reaching for a browser or phone.
 
-`sonosh` is the keyboard-driven terminal UI in this repo: a Go application for
-discovering Sonos speakers, selecting a room, and controlling playback without
-leaving the terminal. The `sonos` CLI and shared backend it builds on are still
-in this repository, but they are described separately below so the TUI-specific
-feature set is clear.
+![sonosh TUI demo](docs/assets/sonosh-demo.gif)
 
-- **Room-aware dashboard**: discover speakers and groups, pick the active room,
-  and keep live now-playing, transport, volume, mute, and playback-mode state
-  in one screen.
-- **Keyboard-first playback control**: play, pause, stop, next, previous,
-  volume up/down, mute toggle, and short scrubbing jumps directly from the UI.
-- **Playback-mode controls**: inspect and toggle shuffle, repeat, and
-  crossfade without dropping to a separate command.
-- **Queue management**: open a live queue pane, page through entries, play a
-  specific position, remove items, move entries, and clear the queue.
-- **Spotify / SMAPI search**: search tracks or playlists from Sonos music
-  services, preview playlist contents, and start playback from search results.
-- **Playlist carousel**: keep pinned playlist shortcuts plus recent playlist
-  results in a persistent carousel, with artwork preserved in the UI.
-- **Album-art rendering**: show cover art inline in the player pane with
-  terminal-friendly fallbacks when richer rendering is unavailable.
-- **Adaptive layouts and themes**: switch visual themes, use a compact layout
-  on narrower terminals, and persist those preferences across launches.
-- **Optional macOS media bridge**: `sonosh` can launch the Swift helper in
-  `helpers/macos/sonosh-helper`, publish now-playing metadata to the system
-  media layer, and bind hardware or Control Center play/pause, toggle, next,
-  and previous commands back into the app over a local Unix-socket JSON
-  protocol.
+## sonosh at a glance
 
-`sonosh` is a Go terminal UI for discovering and controlling Sonos speakers on
-your local network. It is fork-derived from
-[`steipete/sonoscli`](https://github.com/steipete/sonoscli), keeping the mature
-Sonos discovery/control internals while adding a Bubble Tea TUI.
+- room switching
+- now playing and queue inspection
+- playback controls
+- media and playlist browsing
+- macOS media integration through the Swift helper
 
-The `sonosh` TUI currently supports:
+## Sonos CLI and backend
 
-- room discovery and room selection
-- now-playing, volume, and mute status
-- play/pause, stop, next, previous, volume, and mute controls
-- Spotify/SMAPI search through linked Sonos music services
-
-The inherited `sonos` CLI is still available while the TUI grows.
-
-`sonoscli` is a modern Go CLI to control Sonos speakers over your local network (UPnP/SOAP).
-
-## sonoscli Lineage
-
-The sections from here down describe the inherited `sonos` CLI surface and the
-shared Sonos backend capabilities that `sonosh` builds on.
-
-- **Reliable discovery**: SSDP + topology (`ZoneGroupTopology.GetZoneGroupState`) with subnet scan fallback.
-- **Coordinator-aware control**: target any room; commands go to the group coordinator automatically.
-- **Playback controls**: play/pause/stop/next/prev, plus `play-uri`, `linein`, and `tv`.
-- **Grouping**: inspect groups, join/unjoin, party mode, dissolve groups, and **solo** a room.
-- **Queue**: list/play/remove/clear queue entries.
-- **Favorites**: list and play Sonos Favorites by index or title.
-- **Scenes**: save/apply presets (grouping + per-room volume/mute).
-- **Spotify**:
-  - Enqueue/play Spotify share links or canonical `spotify:<type>:<id>` URIs (no Spotify credentials required).
-  - Search Spotify via **SMAPI** (Sonos Music API; uses your linked service in Sonos).
-  - Optional Spotify Web API search (client credentials) if you want it.
-- **YouTube handoff**: resolve a YouTube URL with `yt-dlp` and hand the direct audio stream to Sonos.
-- **Smart URL streaming**: `play-url` runs a short-lived local MP3 proxy for YouTube, YouTube Music playlists, podcasts, radio streams, SoundCloud-style pages, and other URLs.
-- **Live events**: `watch` subscribes to AVTransport + RenderingControl and prints changes.
-- **Scriptable output**: `--format plain|json|tsv` plus `--debug` tracing.
-
-This is not an official Sonos project.
-
-## Requirements
-
-- Your machine must be on the same network as your Sonos system.
-- Speakers must be reachable on TCP port `1400` (e.g. `http://<speaker-ip>:1400/`).
-
-Spotify:
-- Spotify must already be linked in the Sonos app.
-- This CLI does not authenticate with Spotify; it enqueues Sonos “Spotify” URIs/metadata.
-
-Spotify search (recommended, no Spotify Web API credentials):
-- `sonos smapi search` uses Sonos SMAPI to search linked services (e.g. Spotify).
-- Some services require a one-time DeviceLink/AppLink flow: `sonos auth smapi begin|complete`.
-
-Spotify search via Spotify Web API (optional):
-- If you want `sonos search spotify`, you’ll need a Spotify Web API app (client credentials).
-  Set `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` (or pass `--client-id/--client-secret`).
-
-YouTube:
-- Install `yt-dlp` if you want `sonos play youtube`.
-- Sonos plays the resolved temporary audio stream directly; long videos may expire and need resolving again.
-- For most YouTube playback, prefer `sonos play-url`: it proxies the stream through your machine, transcodes to MP3, and avoids Sonos having to fetch YouTube's temporary media URL itself.
-
-Smart URL streaming:
-- Install `yt-dlp` and `ffmpeg` for `sonos play-url`.
-- `play-url` resolves common media pages, pipes `yt-dlp` sources into `ffmpeg`, transcodes to a local MP3 stream, sends the resolved title/provider to Sonos metadata, and exits the proxy when playback ends or goes idle.
-- Unambiguous YouTube / YouTube Music playlist URLs (`?list=…` without `?v=…`) are auto-detected and enqueued track-by-track. Use `--playlist`, `--no-playlist`, and `--playlist-limit` to control playlist handling.
+The `sonos` CLI is documented below.
 
 ## Install / build
 
-Install (Homebrew, single line):
+Install with Homebrew:
 
 ```bash
 brew install shlomiuziel/tap/sonosh
@@ -130,7 +49,7 @@ go install github.com/shlomiuziel/sonosh/cmd/sonosh@latest
 sonosh
 ```
 
-Build the TUI locally:
+Build `sonosh` locally:
 
 ```bash
 go build -o sonosh ./cmd/sonosh
@@ -144,7 +63,7 @@ swift build --package-path helpers/macos/sonosh-helper --configuration release
 ./sonosh --mac-helper-path helpers/macos/sonosh-helper/.build/release/sonosh-macos-helper
 ```
 
-Build the inherited CLI locally:
+Build `sonos` locally:
 
 ```bash
 go build -o sonos ./cmd/sonos
@@ -173,7 +92,7 @@ docker run --rm --network host -v "$PWD/.sonoscli:/data" sonoscli discover
 
 Linux containers need `--network host` for SSDP/UPnP discovery. The image includes `ffmpeg`, `yt-dlp`, and `curl`.
 
-## Quick start
+## First run
 
 Note: if you installed via Homebrew or `go install`, replace `./sonos` with `sonos`.
 
@@ -185,7 +104,7 @@ Discover speakers:
 ./sonos discover --all # include invisible/bonded devices (advanced)
 ```
 
-Show status (text or JSON):
+Show room status:
 
 ```bash
 ./sonos status --name "Kitchen"
@@ -193,7 +112,7 @@ Show status (text or JSON):
 ./sonos status --name "Kitchen" --format json
 ```
 
-Playback:
+Playback controls:
 
 ```bash
 ./sonos play --name "Kitchen"
@@ -203,7 +122,7 @@ Playback:
 ./sonos prev --name "Kitchen"
 ```
 
-Watch live events (track/volume changes):
+Watch live events:
 
 ```bash
 ./sonos watch --name "Kitchen"
@@ -213,19 +132,19 @@ Watch live events (track/volume changes):
 
 Note: this starts a local callback server for UPnP events; your OS firewall may prompt to allow incoming connections.
 
-## Command overview
+## CLI overview
 
 Run `sonos --help` for the full list. Most commonly used:
 
 - Discovery & status: `discover`, `status`/`now`, `watch`
-- Playback: `play`, `pause`, `stop`, `next`, `prev`, `open`, `enqueue`, `play-url`, `play-uri`, `linein`, `tv`
+- Playback controls: `play`, `pause`, `stop`, `next`, `prev`, `open`, `enqueue`, `play-url`, `play-uri`, `linein`, `tv`
 - Grouping: `group status`, `group join`, `group unjoin`, `group solo`, `group party`, `group dissolve`
 - Queue: `queue list`, `queue play`, `queue remove`, `queue clear`
 - Favorites: `favorites list`, `favorites open`
 - Scenes: `scene save`, `scene apply`, `scene list`, `scene delete`
 - Spotify search: `smapi search` (recommended), optional `search spotify` (Spotify Web API)
 
-## Queue
+## Queue management
 
 List the queue:
 
@@ -247,21 +166,21 @@ Clear the queue:
 ./sonos queue clear --name "Kitchen"
 ```
 
-## Scenes (presets)
+## Scenes
 
-Save a scene (grouping + per-room volume/mute):
+Save the current room layout and volumes as a scene:
 
 ```bash
 ./sonos scene save "Evening"
 ```
 
-Apply a scene later:
+Restore a saved scene:
 
 ```bash
 ./sonos scene apply "Evening"
 ```
 
-List / delete scenes:
+Manage saved scenes:
 
 ```bash
 ./sonos scene list
@@ -279,21 +198,21 @@ List Sonos Favorites:
 ./sonos favorites list --name "Kitchen" --format json
 ```
 
-Play by index (from the list):
+Play a favorite by index:
 
 ```bash
 ./sonos favorites open --name "Kitchen" --index 1
 ```
 
-Or play by title (case-insensitive exact match):
+Or play by title:
 
 ```bash
 ./sonos favorites open --name "Kitchen" "BBC Radio 6 Music"
 ```
 
-## Other sources
+## Media URLs
 
-Play an arbitrary URI:
+Play a direct media URL:
 
 ```bash
 ./sonos play-uri --name "Kitchen" "https://example.com/stream.mp3"
@@ -308,34 +227,34 @@ Play a URL through the Sonos-safe local proxy (requires `ffmpeg`; `yt-dlp` for Y
 ./sonos play-url --name "Kitchen" "https://example.com/podcast/episode.mp3"
 ```
 
-Force radio-style playback (useful for station-like streams):
+Play as radio (useful for live streams):
 
 ```bash
 ./sonos play-uri --name "Kitchen" --radio --title "My Stream" "https://example.com/live.mp3"
 ```
 
-Switch to line-in (optionally from another speaker):
+Select line-in input:
 
 ```bash
 ./sonos linein --name "Kitchen" --from "Living Room"
 ```
 
-Switch to TV input (soundbar):
+Select TV input (soundbar):
 
 ```bash
 ./sonos tv --name "Living Room"
 ```
 
-## Grouping
+## Room grouping
 
-Show current groups:
+View current groups:
 
 ```bash
 ./sonos group status
 ./sonos group status --all # include invisible/bonded devices (advanced)
 ```
 
-Join `Bedroom` into `Living Room`’s group:
+Move `Bedroom` into `Living Room`’s group:
 
 ```bash
 ./sonos group join --name "Bedroom" --to "Living Room"
@@ -348,7 +267,7 @@ Room targeting supports fuzzy substring matching (and will suggest matches on am
 ./sonos group join --name "Bed" --to "Liv"     # "Bedroom" joins "Living Room"
 ```
 
-Ungroup a speaker (make it standalone):
+Split a speaker out of its group:
 
 ```bash
 ./sonos group unjoin --name "Bedroom"
@@ -366,26 +285,26 @@ Party mode (join all visible speakers to a target group):
 ./sonos group party --to "Bar"
 ```
 
-Dissolve a group (ungroup all members of the group):
+Remove grouping from the whole group:
 
 ```bash
 ./sonos group dissolve --name "Living Room"
 ```
 
-Ungroup Office and play on Office only:
+Keep `Office` playing on its own:
 
 ```bash
 ./sonos group solo --name "Office"
 ./sonos open --name "Office" "https://open.spotify.com/album/<id>"
 ```
 
-Re-join a speaker back into another group:
+Add a speaker back to a group:
 
 ```bash
 ./sonos group join --name "Office" --to "Bar"
 ```
 
-Group volume / mute (affects the whole group):
+Control group volume and mute:
 
 ```bash
 ./sonos group volume get --name "Living Room"
@@ -395,7 +314,7 @@ Group volume / mute (affects the whole group):
 ./sonos group mute toggle --name "Living Room"
 ```
 
-Volume / mute:
+Control room volume and mute:
 
 ```bash
 ./sonos volume get --name "Kitchen"
@@ -405,7 +324,7 @@ Volume / mute:
 ./sonos mute toggle --name "Kitchen"
 ```
 
-## Targeting and groups
+## Room targeting
 
 Target a speaker by:
 - `--name "Kitchen"` (Sonos room name)
@@ -413,7 +332,7 @@ Target a speaker by:
 
 Most commands must be sent to the *group coordinator* (the device that owns transport state for the group). `sonoscli` resolves the coordinator automatically so commands behave like the Sonos app.
 
-## Spotify
+## Spotify search
 
 Search via Sonos (SMAPI; no Spotify Web API credentials):
 
@@ -450,13 +369,13 @@ export SPOTIFY_CLIENT_SECRET="..."
 ./sonos search spotify --type playlist "focus"
 ```
 
-Open the first search result directly on Sonos:
+Open the first result on Sonos:
 
 ```bash
 ./sonos search spotify --open --name "Kitchen" "miles davis so what"
 ```
 
-Enqueue + play:
+Enqueue and play:
 
 ```bash
 ./sonos open --name "Kitchen" spotify:track:6NmXV4o6bmp704aPGyTVVG
@@ -473,7 +392,7 @@ Notes:
 - The enqueue implementation tries Spotify Sonos service numbers `2311` and `3079` for compatibility.
 - Use `--title` to override the queue display title for some entries.
 
-## Dev workflow
+## Development
 
 ### Makefile
 
@@ -521,7 +440,7 @@ CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
 - `--json`: deprecated alias for `--format json`
 - `--debug`: enable detailed trace logs (SSDP/topology/SOAP timings)
 
-## Config (defaults)
+## Configuration
 
 Persist small local defaults so repeated commands stay terse:
 
