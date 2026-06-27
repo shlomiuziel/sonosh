@@ -203,7 +203,6 @@ func TestEnumerateYTDLPPlaylistFallsBackToIDWhenTitleMissing(t *testing.T) {
 		t.Fatalf("tracks[1] = %+v", tracks[1])
 	}
 }
-
 func TestEnumerateYTDLPPlaylistUsesGenericWebpageURLs(t *testing.T) {
 
 	ytDLP := writeFakeYTDLPPlaylist(t, "https://example.com/watch/1\tNA\tExample	ex1\t42\tExternal Track\n")
