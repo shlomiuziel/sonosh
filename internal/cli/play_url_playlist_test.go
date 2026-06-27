@@ -185,7 +185,6 @@ NA	NA	Youtube	ccc	NA	Third Track
 }
 
 func TestEnumerateYTDLPPlaylistFallsBackToIDWhenTitleMissing(t *testing.T) {
-
 	// Two lines: one with only an id+missing duration, one fully populated.
 	ytDLP := writeFakeYTDLPPlaylist(t, "NA\tNA\tYoutube\tloneid\tNA\t\nNA\tNA\tYoutube\tidtwo\t120\tWith Title\n")
 
@@ -203,8 +202,8 @@ func TestEnumerateYTDLPPlaylistFallsBackToIDWhenTitleMissing(t *testing.T) {
 		t.Fatalf("tracks[1] = %+v", tracks[1])
 	}
 }
-func TestEnumerateYTDLPPlaylistUsesGenericWebpageURLs(t *testing.T) {
 
+func TestEnumerateYTDLPPlaylistUsesGenericWebpageURLs(t *testing.T) {
 	ytDLP := writeFakeYTDLPPlaylist(t, "https://example.com/watch/1\tNA\tExample	ex1\t42\tExternal Track\n")
 
 	tracks, err := enumerateYTDLPPlaylist(context.Background(), ytDLP, "https://example.com/playlist", 0)
@@ -223,7 +222,6 @@ func TestEnumerateYTDLPPlaylistUsesGenericWebpageURLs(t *testing.T) {
 }
 
 func TestEnumerateYTDLPPlaylistErrorsWithoutUsableNonYouTubeURL(t *testing.T) {
-
 	ytDLP := writeFakeYTDLPPlaylist(t, "NA\tlocal-id\tGeneric\tabc\t12\tNo URL\n")
 
 	_, err := enumerateYTDLPPlaylist(context.Background(), ytDLP, "https://example.com/playlist", 0)
@@ -233,7 +231,6 @@ func TestEnumerateYTDLPPlaylistErrorsWithoutUsableNonYouTubeURL(t *testing.T) {
 }
 
 func TestLooksLikePlaylistURLDoesNotAutoDetectYoutuBeVideoLinks(t *testing.T) {
-
 	if looksLikePlaylistURL("https://youtu.be/abc123?list=PL123") {
 		t.Fatalf("youtu.be video link with list should stay single-track unless --playlist is set")
 	}
