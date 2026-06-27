@@ -165,7 +165,6 @@ func TestParseYTDLPStream(t *testing.T) {
 }
 
 func TestYTDLPResolverResolve(t *testing.T) {
-
 	path := filepath.Join(t.TempDir(), "yt-dlp")
 	script := `#!/bin/sh
 if [ "${1:-}" = "fail" ]; then

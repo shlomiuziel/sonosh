@@ -152,7 +152,6 @@ func TestPlayURLPlaylistCmdReturnsErrorWhenEnumerationFails(t *testing.T) {
 }
 
 func TestEnumerateYTDLPPlaylistParsesIDsTitlesAndDurations(t *testing.T) {
-
 	ytDLP := writeFakeYTDLPPlaylist(t, `https://music.youtube.com/watch?v=aaa	https://music.youtube.com/watch?v=aaa	Youtube	aaa	191	First Track
 https://music.youtube.com/watch?v=bbb	https://music.youtube.com/watch?v=bbb	Youtube	bbb	245.5	Second Track
 NA	NA	Youtube	ccc	NA	Third Track
