@@ -22,6 +22,10 @@ func main() {
 	if err != nil {
 		layoutConfigPath = ""
 	}
+	helperHUDConfigPath, err := tui.DefaultHelperHUDConfigPath()
+	if err != nil {
+		helperHUDConfigPath = ""
+	}
 	carouselConfigPath, err := tui.DefaultPlaylistCarouselConfigPath()
 	if err != nil {
 		carouselConfigPath = ""
@@ -33,6 +37,10 @@ func main() {
 	storedCompact, err := tui.LoadCompactLayout(layoutConfigPath)
 	if err != nil {
 		storedCompact = false
+	}
+	storedHelperHUD, err := tui.LoadHelperHUDEnabled(helperHUDConfigPath)
+	if err != nil {
+		storedHelperHUD = true
 	}
 	defaultTheme := "aurora"
 	if storedTheme != "" {
@@ -54,16 +62,18 @@ func main() {
 	}
 
 	cfg := tui.Config{
-		Timeout:          normalizeTimeout(*timeout),
-		SearchService:    *service,
-		SearchCategory:   *category,
-		SearchLimit:      *limit,
-		Theme:            *theme,
-		ThemeConfigPath:  themeConfigPath,
-		Compact:          storedCompact,
-		LayoutConfigPath: layoutConfigPath,
-		CarouselPath:     carouselConfigPath,
-		MacHelperPath:    *macHelperPath,
+		Timeout:             normalizeTimeout(*timeout),
+		SearchService:       *service,
+		SearchCategory:      *category,
+		SearchLimit:         *limit,
+		HelperHUDEnabled:    storedHelperHUD,
+		HelperHUDConfigPath: helperHUDConfigPath,
+		Theme:               *theme,
+		ThemeConfigPath:     themeConfigPath,
+		Compact:             storedCompact,
+		LayoutConfigPath:    layoutConfigPath,
+		CarouselPath:        carouselConfigPath,
+		MacHelperPath:       *macHelperPath,
 	}
 	model := tui.NewModel(tui.NewSonosBackend(cfg.Timeout), cfg)
 	program := tea.NewProgram(model, tea.WithAltScreen())

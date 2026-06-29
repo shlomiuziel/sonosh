@@ -1,5 +1,6 @@
 import Darwin
 import AppKit
+import ApplicationServices
 import Foundation
 import MediaPlayer
 import SonoshHelperCore
@@ -77,30 +78,35 @@ final class MediaBridge: @unchecked Sendable {
 
         center.playCommand.isEnabled = true
         center.playCommand.addTarget { [connection] _ in
+            MediaKeyHUD.shared.show(command: "play")
             connection.send(.command("play"))
             return .success
         }
 
         center.pauseCommand.isEnabled = true
         center.pauseCommand.addTarget { [connection] _ in
+            MediaKeyHUD.shared.show(command: "pause")
             connection.send(.command("pause"))
             return .success
         }
 
         center.togglePlayPauseCommand.isEnabled = true
         center.togglePlayPauseCommand.addTarget { [connection] _ in
+            MediaKeyHUD.shared.show(command: "togglePlayPause")
             connection.send(.command("togglePlayPause"))
             return .success
         }
 
         center.nextTrackCommand.isEnabled = true
         center.nextTrackCommand.addTarget { [connection] _ in
+            MediaKeyHUD.shared.show(command: "next")
             connection.send(.command("next"))
             return .success
         }
 
         center.previousTrackCommand.isEnabled = true
         center.previousTrackCommand.addTarget { [connection] _ in
+            MediaKeyHUD.shared.show(command: "previous")
             connection.send(.command("previous"))
             return .success
         }
@@ -114,6 +120,10 @@ final class MediaBridge: @unchecked Sendable {
             }
         case "nowPlaying":
             updateNowPlaying(message)
+        case "settings":
+            if let enabled = message.hudEnabled {
+                MediaKeyHUD.shared.setEnabled(enabled)
+            }
         case "clear":
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
@@ -152,6 +162,293 @@ final class MediaBridge: @unchecked Sendable {
         default:
             MPNowPlayingInfoCenter.default().playbackState = .unknown
         }
+    }
+}
+
+final class MediaKeyHUD {
+    static let shared = MediaKeyHUD()
+
+    private var panel: NSPanel?
+    private var symbolView: NSImageView?
+    private var titleField: NSTextField?
+    private var hideWorkItem: DispatchWorkItem?
+    private var isEnabled = true
+
+    private init() {}
+
+    private func ensurePanel() {
+        if panel != nil {
+            return
+        }
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .statusBar
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.ignoresMouseEvents = true
+        panel.alphaValue = 0
+
+        let visualEffectView = NSVisualEffectView(frame: panel.contentView?.bounds ?? .zero)
+        visualEffectView.translatesAutoresizingMaskIntoConstraints = false
+        visualEffectView.material = .hudWindow
+        visualEffectView.blendingMode = .behindWindow
+        visualEffectView.state = .active
+        visualEffectView.wantsLayer = true
+        visualEffectView.layer?.cornerRadius = 20
+        visualEffectView.layer?.masksToBounds = true
+        panel.contentView = visualEffectView
+
+        let symbolView = NSImageView()
+        symbolView.translatesAutoresizingMaskIntoConstraints = false
+        symbolView.imageScaling = .scaleProportionallyUpOrDown
+        symbolView.contentTintColor = .white
+
+        let titleField = NSTextField(labelWithString: "")
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        titleField.font = .systemFont(ofSize: 18, weight: .semibold)
+        titleField.textColor = .white
+        titleField.alignment = .center
+        titleField.maximumNumberOfLines = 2
+        titleField.lineBreakMode = .byTruncatingTail
+
+        visualEffectView.addSubview(symbolView)
+        visualEffectView.addSubview(titleField)
+
+        NSLayoutConstraint.activate([
+            symbolView.centerXAnchor.constraint(equalTo: visualEffectView.centerXAnchor),
+            symbolView.topAnchor.constraint(equalTo: visualEffectView.topAnchor, constant: 22),
+            symbolView.widthAnchor.constraint(equalToConstant: 34),
+            symbolView.heightAnchor.constraint(equalToConstant: 34),
+
+            titleField.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 16),
+            titleField.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -16),
+            titleField.topAnchor.constraint(equalTo: symbolView.bottomAnchor, constant: 12),
+            titleField.bottomAnchor.constraint(lessThanOrEqualTo: visualEffectView.bottomAnchor, constant: -18)
+        ])
+
+        self.panel = panel
+        self.symbolView = symbolView
+        self.titleField = titleField
+    }
+
+    func show(command: String) {
+        DispatchQueue.main.async {
+            self.present(command: command)
+        }
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        DispatchQueue.main.async {
+            self.isEnabled = enabled
+            if !enabled {
+                self.hideWorkItem?.cancel()
+                self.dismiss()
+            }
+        }
+    }
+
+    private func present(command: String) {
+        guard isEnabled else {
+            return
+        }
+        guard let presentation = hudPresentation(for: command) else {
+            return
+        }
+        ensurePanel()
+        guard let panel, let symbolView, let titleField else {
+            return
+        }
+
+        hideWorkItem?.cancel()
+        titleField.stringValue = presentation.title
+        symbolView.image = presentation.symbolName.flatMap {
+            NSImage(systemSymbolName: $0, accessibilityDescription: presentation.title)
+        }
+        symbolView.isHidden = symbolView.image == nil
+
+        positionPanel()
+        panel.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            panel.animator().alphaValue = 1
+        }
+
+        let hide = DispatchWorkItem { [weak self] in
+            self?.dismiss()
+        }
+        hideWorkItem = hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: hide)
+    }
+
+    private func dismiss() {
+        guard let panel else {
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.18
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [panel] in
+            panel.orderOut(nil)
+        })
+    }
+
+    private func positionPanel() {
+        guard let panel else {
+            return
+        }
+        let targetFrame = frameForPanel()
+        panel.setFrame(targetFrame, display: false)
+    }
+
+    private func frameForPanel() -> NSRect {
+        let fallback = NSRect(x: 0, y: 0, width: 240, height: 120)
+        let screen = NSScreen.main ?? NSScreen.screens.first
+        guard let frame = screen?.visibleFrame else {
+            return fallback
+        }
+        let originX = frame.midX - fallback.width / 2
+        let originY = frame.minY + 120
+        return NSRect(x: originX, y: originY, width: fallback.width, height: fallback.height)
+    }
+}
+
+private func hudPresentation(for command: String) -> (title: String, symbolName: String?)? {
+    switch command {
+    case "play":
+        return ("Play", "play.fill")
+    case "pause":
+        return ("Pause", "pause.fill")
+    case "togglePlayPause":
+        return ("Play/Pause", "playpause.fill")
+    case "next":
+        return ("Next", "forward.fill")
+    case "previous":
+        return ("Previous", "backward.fill")
+    case "volumeUp":
+        return ("Volume Up", "speaker.wave.2.fill")
+    case "volumeDown":
+        return ("Volume Down", "speaker.wave.1.fill")
+    default:
+        return nil
+    }
+}
+
+private let nxSubtypeAuxControlButtons: Int16 = 8
+private let nxKeyStateDown = 0x0A
+private let nxKeyTypeSoundUp = 0
+private let nxKeyTypeSoundDown = 1
+private let cgEventTypeSystemDefined = 14
+
+final class VolumeKeyMonitor: @unchecked Sendable {
+    private let connection: IPCConnection
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+
+    init(connection: IPCConnection) {
+        self.connection = connection
+    }
+
+    deinit {
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        if let eventTap {
+            CFMachPortInvalidate(eventTap)
+        }
+    }
+
+    func install() -> String? {
+        guard ensureAccessibilityPermission() else {
+            return "volume keys require Accessibility access; grant it in System Settings > Privacy & Security > Accessibility"
+        }
+
+        let mask = (1 as CGEventMask) << cgEventTypeSystemDefined
+        let callback: CGEventTapCallBack = { _, type, event, userInfo in
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                if let userInfo {
+                    let monitor = Unmanaged<VolumeKeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+                    monitor.reenableEventTap()
+                }
+                return Unmanaged.passUnretained(event)
+            }
+            guard let userInfo else {
+                return Unmanaged.passUnretained(event)
+            }
+            let monitor = Unmanaged<VolumeKeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+            return monitor.handle(event: event)
+        }
+
+        let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        guard let eventTap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask, callback: callback, userInfo: userInfo) else {
+            return "failed to install volume key event tap; verify Accessibility access is enabled"
+        }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        self.eventTap = eventTap
+        self.runLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        return nil
+    }
+
+    private func reenableEventTap() {
+        guard let eventTap else {
+            return
+        }
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+    }
+
+    private func handle(event: CGEvent) -> Unmanaged<CGEvent>? {
+        guard let nsEvent = NSEvent(cgEvent: event) else {
+            return Unmanaged.passUnretained(event)
+        }
+        guard let command = volumeCommand(for: nsEvent) else {
+            return Unmanaged.passUnretained(event)
+        }
+        MediaKeyHUD.shared.show(command: command)
+        connection.send(.command(command))
+        return nil
+    }
+}
+
+func ensureAccessibilityPermission() -> Bool {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+    return AXIsProcessTrustedWithOptions(options)
+}
+
+func volumeCommand(for event: NSEvent) -> String? {
+    volumeCommand(subtype: event.subtype.rawValue, data1: Int(event.data1))
+}
+
+func volumeCommand(subtype: Int16, data1: Int) -> String? {
+    guard subtype == nxSubtypeAuxControlButtons else {
+        return nil
+    }
+
+    let keyCode = (data1 & 0xFFFF0000) >> 16
+    let keyFlags = data1 & 0x0000FFFF
+    let keyState = (keyFlags & 0xFF00) >> 8
+    let isRepeat = (keyFlags & 0x1) == 0x1
+    guard keyState == nxKeyStateDown, !isRepeat else {
+        return nil
+    }
+
+    switch keyCode {
+    case nxKeyTypeSoundUp:
+        return "volumeUp"
+    case nxKeyTypeSoundDown:
+        return "volumeDown"
+    default:
+        return nil
     }
 }
 
@@ -217,7 +514,11 @@ do {
 
     let connection = try IPCConnection(socketPath: path)
     let bridge = MediaBridge(connection: connection)
+    let volumeKeys = VolumeKeyMonitor(connection: connection)
     bridge.installRemoteCommands()
+    if let errorMessage = volumeKeys.install() {
+        connection.send(.error(errorMessage))
+    }
     connection.send(.ready())
     connection.readLoop(
         onMessage: { message in bridge.handle(message) },

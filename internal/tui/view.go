@@ -531,6 +531,7 @@ func (m Model) renderPlaybackConfigContent(width int) string {
 		playbackSettingRow("Crossfade", crossfadeState, m.status.CrossfadeKnown, contentWidth, m.playbackConfigIndex == 0),
 		playbackSettingRow("Shuffle", shuffleState, m.status.ShuffleKnown, contentWidth, m.playbackConfigIndex == 1),
 		playbackSettingRow("Repeat", repeatState, m.status.RepeatKnown, contentWidth, m.playbackConfigIndex == 2),
+		playbackSettingRow("Media HUD", onOff(m.helperHUDEnabled), true, contentWidth, m.playbackConfigIndex == 3),
 		"",
 		hintStyle.Width(contentWidth).Render("up/down move  space toggle  esc close"),
 	}
