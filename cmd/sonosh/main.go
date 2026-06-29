@@ -38,9 +38,9 @@ func main() {
 	if err != nil {
 		storedCompact = false
 	}
-	storedHelperHUD, err := tui.LoadHelperHUDEnabled(helperHUDConfigPath)
+	storedHelperHUD, err := tui.LoadHelperHUDConfig(helperHUDConfigPath)
 	if err != nil {
-		storedHelperHUD = true
+		storedHelperHUD = tui.DefaultHelperHUDConfig()
 	}
 	defaultTheme := "aurora"
 	if storedTheme != "" {
@@ -66,7 +66,8 @@ func main() {
 		SearchService:       *service,
 		SearchCategory:      *category,
 		SearchLimit:         *limit,
-		HelperHUDEnabled:    storedHelperHUD,
+		HelperHUDEnabled:    storedHelperHUD.Enabled,
+		HelperHUDPosition:   storedHelperHUD.Position,
 		HelperHUDConfigPath: helperHUDConfigPath,
 		Theme:               *theme,
 		ThemeConfigPath:     themeConfigPath,

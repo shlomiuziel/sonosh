@@ -16,6 +16,7 @@ public struct IPCMessage: Codable, Equatable {
     public var volume: Int?
     public var muted: Bool?
     public var hudEnabled: Bool?
+    public var hudPosition: String?
     public var command: String?
     public var message: String?
 
@@ -33,6 +34,7 @@ public struct IPCMessage: Codable, Equatable {
         volume: Int? = nil,
         muted: Bool? = nil,
         hudEnabled: Bool? = nil,
+        hudPosition: String? = nil,
         command: String? = nil,
         message: String? = nil
     ) {
@@ -49,6 +51,7 @@ public struct IPCMessage: Codable, Equatable {
         self.volume = volume
         self.muted = muted
         self.hudEnabled = hudEnabled
+        self.hudPosition = hudPosition
         self.command = command
         self.message = message
     }

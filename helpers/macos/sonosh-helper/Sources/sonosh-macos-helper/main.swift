@@ -124,6 +124,9 @@ final class MediaBridge: @unchecked Sendable {
             if let enabled = message.hudEnabled {
                 MediaKeyHUD.shared.setEnabled(enabled)
             }
+            if let position = message.hudPosition {
+                MediaKeyHUD.shared.setPosition(position)
+            }
         case "clear":
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
@@ -173,6 +176,7 @@ final class MediaKeyHUD {
     private var titleField: NSTextField?
     private var hideWorkItem: DispatchWorkItem?
     private var isEnabled = true
+    private var position = "default"
 
     private init() {}
 
@@ -256,6 +260,13 @@ final class MediaKeyHUD {
         }
     }
 
+    func setPosition(_ position: String) {
+        DispatchQueue.main.async {
+            self.position = self.normalizeHUDPosition(position)
+            self.panel?.setFrame(self.frameForPanel(), display: true)
+        }
+    }
+
     private func present(command: String) {
         guard isEnabled else {
             return
@@ -315,9 +326,29 @@ final class MediaKeyHUD {
         guard let frame = screen?.visibleFrame else {
             return fallback
         }
-        let originX = frame.midX - fallback.width / 2
-        let originY = frame.minY + 120
-        return NSRect(x: originX, y: originY, width: fallback.width, height: fallback.height)
+        switch normalizeHUDPosition(position) {
+        case "top-left":
+            return NSRect(x: frame.minX + 32, y: frame.maxY - fallback.height - 32, width: fallback.width, height: fallback.height)
+        case "top-right":
+            return NSRect(x: frame.maxX - fallback.width - 32, y: frame.maxY - fallback.height - 32, width: fallback.width, height: fallback.height)
+        case "bottom-left":
+            return NSRect(x: frame.minX + 32, y: frame.minY + 32, width: fallback.width, height: fallback.height)
+        case "bottom-right":
+            return NSRect(x: frame.maxX - fallback.width - 32, y: frame.minY + 32, width: fallback.width, height: fallback.height)
+        default:
+            let originX = frame.midX - fallback.width / 2
+            let originY = frame.minY + 120
+            return NSRect(x: originX, y: originY, width: fallback.width, height: fallback.height)
+        }
+    }
+
+    private func normalizeHUDPosition(_ position: String) -> String {
+        switch position.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "top-left", "top-right", "bottom-left", "bottom-right":
+            return position.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        default:
+            return "default"
+        }
     }
 }
 

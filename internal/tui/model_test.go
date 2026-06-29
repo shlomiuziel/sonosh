@@ -166,7 +166,11 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 		shuffle:   false,
 		repeat:    "off",
 	}
-	model := NewModel(backend, testConfig())
+	cfg := testConfig()
+	cfg.HelperHUDEnabled = false
+	cfg.HelperHUDPosition = defaultHelperHUDPosition
+	cfg.HelperHUDConfigPath = filepath.Join(t.TempDir(), "helper_hud.json")
+	model := NewModel(backend, cfg)
 	model.rooms = backend.rooms
 	model.status = backend.status
 
@@ -183,7 +187,7 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	}
 
 	view := model.View()
-	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "Media HUD", "off", "UP/DOWN MOVE"} {
+	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "Media HUD", "HUD Position", "UP/DOWN MOVE"} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("playback config view missing %q:\n%s", want, view)
 		}
@@ -296,11 +300,43 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("did not expect backend command for media HUD toggle")
 	}
-	if model.helperHUDEnabled {
-		t.Fatal("expected media HUD to be disabled")
+	if !model.helperHUDEnabled {
+		t.Fatal("expected media HUD to be enabled")
 	}
-	if model.message != "media HUD off" {
-		t.Fatalf("message = %q, want media HUD off", model.message)
+	if model.message != "media HUD on" {
+		t.Fatalf("message = %q, want media HUD on", model.message)
+	}
+
+	updated, cmd = model.Update(key("down"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command on playback config move")
+	}
+	if model.playbackConfigIndex != 4 {
+		t.Fatalf("playbackConfigIndex = %d, want 4", model.playbackConfigIndex)
+	}
+
+	updated, cmd = model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect backend command for media HUD position change")
+	}
+	if model.helperHUDPosition != "top-left" {
+		t.Fatalf("helperHUDPosition = %q, want top-left", model.helperHUDPosition)
+	}
+	if model.message != "media HUD position top l" {
+		t.Fatalf("message = %q, want media HUD position top l", model.message)
+	}
+
+	storedHUD, err := LoadHelperHUDConfig(cfg.HelperHUDConfigPath)
+	if err != nil {
+		t.Fatalf("LoadHelperHUDConfig: %v", err)
+	}
+	if !storedHUD.Enabled {
+		t.Fatal("stored helper HUD should remain enabled")
+	}
+	if storedHUD.Position != "top-left" {
+		t.Fatalf("stored position = %q, want top-left", storedHUD.Position)
 	}
 }
 

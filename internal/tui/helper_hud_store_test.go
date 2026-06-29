@@ -6,41 +6,56 @@ import (
 	"testing"
 )
 
-func TestSaveAndLoadHelperHUDEnabled(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "helper_hud.json")
+func TestSaveAndLoadHelperHUDConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "helper_hud.json")
+	want := HelperHUDConfig{Enabled: false, Position: "top-right"}
 
-	if err := SaveHelperHUDEnabled(path, false); err != nil {
-		t.Fatalf("SaveHelperHUDEnabled: %v", err)
+	if err := SaveHelperHUDConfig(path, want); err != nil {
+		t.Fatalf("SaveHelperHUDConfig: %v", err)
 	}
 
-	got, err := LoadHelperHUDEnabled(path)
+	got, err := LoadHelperHUDConfig(path)
 	if err != nil {
-		t.Fatalf("LoadHelperHUDEnabled: %v", err)
+		t.Fatalf("LoadHelperHUDConfig: %v", err)
 	}
-	if got {
-		t.Fatalf("LoadHelperHUDEnabled = %v, want false", got)
+	if got != want {
+		t.Fatalf("config = %+v, want %+v", got, want)
 	}
 }
 
-func TestLoadHelperHUDEnabledDefaultsTrueForMissingFile(t *testing.T) {
-	got, err := LoadHelperHUDEnabled(filepath.Join(t.TempDir(), "missing.json"))
+func TestLoadHelperHUDConfigDefaultsForMissingFile(t *testing.T) {
+	got, err := LoadHelperHUDConfig(filepath.Join(t.TempDir(), "missing.json"))
 	if err != nil {
-		t.Fatalf("LoadHelperHUDEnabled: %v", err)
+		t.Fatalf("LoadHelperHUDConfig: %v", err)
 	}
-	if !got {
-		t.Fatalf("LoadHelperHUDEnabled = %v, want true", got)
+	want := DefaultHelperHUDConfig()
+	if got != want {
+		t.Fatalf("config = %+v, want %+v", got, want)
 	}
 }
 
-func TestLoadHelperHUDEnabledInvalidJSON(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "helper_hud.json")
+func TestLoadHelperHUDConfigInvalidJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "helper_hud.json")
 	if err := os.WriteFile(path, []byte("{not-json"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	if _, err := LoadHelperHUDEnabled(path); err == nil {
-		t.Fatal("expected parse error")
+	if _, err := LoadHelperHUDConfig(path); err == nil {
+		t.Fatal("LoadHelperHUDConfig: expected error")
+	}
+}
+
+func TestLoadHelperHUDConfigNormalizesUnknownPosition(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "helper_hud.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"enabled":true,"position":"weird"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got, err := LoadHelperHUDConfig(path)
+	if err != nil {
+		t.Fatalf("LoadHelperHUDConfig: %v", err)
+	}
+	if got.Position != defaultHelperHUDPosition {
+		t.Fatalf("position = %q, want %q", got.Position, defaultHelperHUDPosition)
 	}
 }

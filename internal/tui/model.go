@@ -29,6 +29,7 @@ type Config struct {
 	SearchLimit         int
 	MacHelperPath       string
 	HelperHUDEnabled    bool
+	HelperHUDPosition   string
 	HelperHUDConfigPath string
 	Theme               string
 	ThemeConfigPath     string
@@ -88,6 +89,7 @@ type Model struct {
 	dashboardFocus          dashboardFocus
 	compactLayout           bool
 	helperHUDEnabled        bool
+	helperHUDPosition       string
 
 	width  int
 	height int
@@ -234,18 +236,19 @@ func NewModel(backend Backend, cfg Config) Model {
 		carouselStore = defaultPlaylistCarouselStore()
 	}
 	return Model{
-		backend:          backend,
-		config:           cfg,
-		helper:           macoshelper.New(cfg.MacHelperPath),
-		mode:             modeDashboard,
-		loading:          true,
-		searchCategory:   cfg.SearchCategory,
-		themeName:        themeName,
-		compactLayout:    cfg.Compact,
-		helperHUDEnabled: cfg.HelperHUDEnabled,
-		carouselStore:    carouselStore,
-		carouselPinned:   playlistCarouselPinnedResults(carouselStore),
-		carouselRecent:   playlistCarouselRecentResults(carouselStore),
+		backend:           backend,
+		config:            cfg,
+		helper:            macoshelper.New(cfg.MacHelperPath),
+		mode:              modeDashboard,
+		loading:           true,
+		searchCategory:    cfg.SearchCategory,
+		themeName:         themeName,
+		compactLayout:     cfg.Compact,
+		helperHUDEnabled:  cfg.HelperHUDEnabled,
+		helperHUDPosition: normalizeHelperHUDPosition(cfg.HelperHUDPosition),
+		carouselStore:     carouselStore,
+		carouselPinned:    playlistCarouselPinnedResults(carouselStore),
+		carouselRecent:    playlistCarouselRecentResults(carouselStore),
 	}
 }
 
@@ -748,17 +751,28 @@ func (m Model) updatePlaybackConfigKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "down", "j":
-		if m.playbackConfigIndex < 3 {
+		if m.playbackConfigIndex < 4 {
 			m.playbackConfigIndex++
 		}
 		return m, nil
 	case " ", "enter":
 		if m.playbackConfigIndex == 3 {
 			m.helperHUDEnabled = !m.helperHUDEnabled
-			if err := SaveHelperHUDEnabled(m.config.HelperHUDConfigPath, m.helperHUDEnabled); err != nil {
+			if err := SaveHelperHUDConfig(m.config.HelperHUDConfigPath, m.currentHelperHUDConfig()); err != nil {
 				m.message = "helper HUD save failed: " + err.Error()
 			} else {
 				m.message = "media HUD " + onOff(m.helperHUDEnabled)
+			}
+			m.publishHelperSettings()
+			m.err = nil
+			return m, nil
+		}
+		if m.playbackConfigIndex == 4 {
+			m.helperHUDPosition = nextHelperHUDPosition(m.helperHUDPosition)
+			if err := SaveHelperHUDConfig(m.config.HelperHUDConfigPath, m.currentHelperHUDConfig()); err != nil {
+				m.message = "helper HUD save failed: " + err.Error()
+			} else {
+				m.message = "media HUD position " + strings.ToLower(helperHUDPositionLabel(m.helperHUDPosition))
 			}
 			m.publishHelperSettings()
 			m.err = nil
@@ -1417,7 +1431,19 @@ func (m Model) publishHelperSettings() {
 		return
 	}
 	enabled := m.helperHUDEnabled
-	m.helper.Publish(macoshelper.Message{Type: "settings", HUDEnabled: &enabled})
+	position := normalizeHelperHUDPosition(m.helperHUDPosition)
+	m.helper.Publish(macoshelper.Message{
+		Type:        "settings",
+		HUDEnabled:  &enabled,
+		HUDPosition: &position,
+	})
+}
+
+func (m Model) currentHelperHUDConfig() HelperHUDConfig {
+	return HelperHUDConfig{
+		Enabled:  m.helperHUDEnabled,
+		Position: normalizeHelperHUDPosition(m.helperHUDPosition),
+	}
 }
 
 func discoverCmd(backend Backend, timeout time.Duration) tea.Cmd {
