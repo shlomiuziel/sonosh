@@ -531,6 +531,8 @@ func (m Model) renderPlaybackConfigContent(width int) string {
 		playbackSettingRow("Crossfade", crossfadeState, m.status.CrossfadeKnown, contentWidth, m.playbackConfigIndex == 0),
 		playbackSettingRow("Shuffle", shuffleState, m.status.ShuffleKnown, contentWidth, m.playbackConfigIndex == 1),
 		playbackSettingRow("Repeat", repeatState, m.status.RepeatKnown, contentWidth, m.playbackConfigIndex == 2),
+		playbackSettingRow("Media HUD", onOff(m.helperHUDEnabled), true, contentWidth, m.playbackConfigIndex == 3),
+		playbackSettingRow("HUD Position", helperHUDPositionLabel(m.helperHUDPosition), true, contentWidth, m.playbackConfigIndex == 4),
 		"",
 		hintStyle.Width(contentWidth).Render("up/down move  space toggle  esc close"),
 	}
@@ -539,24 +541,27 @@ func (m Model) renderPlaybackConfigContent(width int) string {
 
 func playbackSettingRow(label, state string, known bool, width int, selected bool) string {
 	pill := settingPill(state, known)
-	contentWidth := max(1, width-lipgloss.Width(pill)-2)
 	marker := paneSpace(2)
-	labelWidth := contentWidth
+	labelWidth := max(1, width-lipgloss.Width(marker))
 	if selected {
 		marker = accentStyle.Render("▸") + paneSpace(1)
-		labelWidth = max(1, width-lipgloss.Width(pill)-lipgloss.Width(marker)-2)
+		labelWidth = max(1, width-lipgloss.Width(marker))
 	}
-	row := lipgloss.JoinHorizontal(
+
+	labelLine := lipgloss.JoinHorizontal(
 		lipgloss.Center,
 		marker,
 		titleStyle.Width(labelWidth).Render(displayText(label, labelWidth)),
-		paneSpace(2),
-		pill,
 	)
 	if selected {
-		return selectedStyle.Width(width).Render(row)
+		labelLine = lipgloss.NewStyle().
+			Foreground(colorSelected).
+			Background(colorPanel).
+			Bold(true).
+			Width(width).
+			Render(labelLine)
 	}
-	return row
+	return strings.Join([]string{labelLine, pill}, "\n")
 }
 
 func settingPill(value string, known bool) string {
@@ -573,7 +578,7 @@ func settingPill(value string, known bool) string {
 	case "off":
 		return style.Background(colorSubtle).Foreground(colorInk).Render("off")
 	}
-	return style.Background(colorSubtle).Foreground(colorInk).Render(displayText(value, 4))
+	return style.Background(colorSubtle).Foreground(colorInk).Render(value)
 }
 
 func (m Model) renderSearchPanel(width int) string {

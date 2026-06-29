@@ -24,7 +24,9 @@ func TestModelLoadsRoomsAndStatus(t *testing.T) {
 			Volume: 25,
 		},
 	}
-	model := NewModel(backend, testConfig())
+	cfg := testConfig()
+	cfg.HelperHUDConfigPath = filepath.Join(t.TempDir(), "helper_hud.json")
+	model := NewModel(backend, cfg)
 
 	updated, cmd := model.Update(roomsMsg{rooms: backend.rooms})
 	model = updated.(Model)
@@ -164,7 +166,11 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 		shuffle:   false,
 		repeat:    "off",
 	}
-	model := NewModel(backend, testConfig())
+	cfg := testConfig()
+	cfg.HelperHUDEnabled = false
+	cfg.HelperHUDPosition = defaultHelperHUDPosition
+	cfg.HelperHUDConfigPath = filepath.Join(t.TempDir(), "helper_hud.json")
+	model := NewModel(backend, cfg)
 	model.rooms = backend.rooms
 	model.status = backend.status
 
@@ -181,7 +187,7 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	}
 
 	view := model.View()
-	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "off", "UP/DOWN MOVE"} {
+	for _, want := range []string{"PLAYBACK", "Crossfade", "Shuffle", "Repeat", "Media HUD", "HUD Position", "UP/DOWN MOVE"} {
 		if !strings.Contains(strings.ToUpper(view), strings.ToUpper(want)) {
 			t.Fatalf("playback config view missing %q:\n%s", want, view)
 		}
@@ -278,6 +284,59 @@ func TestPlaybackConfigModalTogglesPlaybackSettings(t *testing.T) {
 	}
 	if refreshCmd == nil {
 		t.Fatal("expected status refresh after repeat toggle")
+	}
+
+	updated, cmd = model.Update(key("down"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command on playback config move")
+	}
+	if model.playbackConfigIndex != 3 {
+		t.Fatalf("playbackConfigIndex = %d, want 3", model.playbackConfigIndex)
+	}
+
+	updated, cmd = model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect backend command for media HUD toggle")
+	}
+	if !model.helperHUDEnabled {
+		t.Fatal("expected media HUD to be enabled")
+	}
+	if model.message != "media HUD on" {
+		t.Fatalf("message = %q, want media HUD on", model.message)
+	}
+
+	updated, cmd = model.Update(key("down"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect command on playback config move")
+	}
+	if model.playbackConfigIndex != 4 {
+		t.Fatalf("playbackConfigIndex = %d, want 4", model.playbackConfigIndex)
+	}
+
+	updated, cmd = model.Update(key("enter"))
+	model = updated.(Model)
+	if cmd != nil {
+		t.Fatal("did not expect backend command for media HUD position change")
+	}
+	if model.helperHUDPosition != "top-left" {
+		t.Fatalf("helperHUDPosition = %q, want top-left", model.helperHUDPosition)
+	}
+	if model.message != "media HUD position top l" {
+		t.Fatalf("message = %q, want media HUD position top l", model.message)
+	}
+
+	storedHUD, err := LoadHelperHUDConfig(cfg.HelperHUDConfigPath)
+	if err != nil {
+		t.Fatalf("LoadHelperHUDConfig: %v", err)
+	}
+	if !storedHUD.Enabled {
+		t.Fatal("stored helper HUD should remain enabled")
+	}
+	if storedHUD.Position != "top-left" {
+		t.Fatalf("stored position = %q, want top-left", storedHUD.Position)
 	}
 }
 
@@ -1162,6 +1221,47 @@ func TestMacHelperCommandDispatchesTransport(t *testing.T) {
 	}
 }
 
+func TestMacHelperCommandAdjustsVolume(t *testing.T) {
+	backend := &fakeBackend{
+		rooms: []Room{{Name: "Kitchen", IP: "192.0.2.10", CoordinatorIP: "192.0.2.10"}},
+	}
+	model := NewModel(backend, testConfig())
+	model.rooms = backend.rooms
+
+	model.status.Volume = 25
+	updated, cmd := model.Update(macHelperCommandMsg{command: "volumeUp"})
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected volume command")
+	}
+	_ = runCmd(cmd)
+	if backend.volume != 30 {
+		t.Fatalf("volume = %d, want 30", backend.volume)
+	}
+
+	model.status.Volume = 3
+	updated, cmd = model.Update(macHelperCommandMsg{command: "volumeDown"})
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected volume command")
+	}
+	_ = runCmd(cmd)
+	if backend.volume != 0 {
+		t.Fatalf("volume = %d, want 0", backend.volume)
+	}
+
+	model.status.Volume = 98
+	updated, cmd = model.Update(macHelperCommandMsg{command: "volumeUp"})
+	model = updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected volume command")
+	}
+	_ = runCmd(cmd)
+	if backend.volume != 100 {
+		t.Fatalf("volume = %d, want 100", backend.volume)
+	}
+}
+
 func TestMacHelperUnavailableIsVisible(t *testing.T) {
 	model := NewModel(&fakeBackend{}, testConfig())
 
@@ -1683,7 +1783,7 @@ func TestQueueFocusDispatchesActions(t *testing.T) {
 }
 
 func testConfig() Config {
-	return Config{Timeout: time.Second, SearchService: "Spotify", SearchCategory: "tracks", SearchLimit: 10}
+	return Config{Timeout: time.Second, SearchService: "Spotify", SearchCategory: "tracks", SearchLimit: 10, HelperHUDEnabled: true}
 }
 
 func storeHasPlaylist(items []playlistCarouselStoreItem, id string) bool {

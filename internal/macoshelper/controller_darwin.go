@@ -19,14 +19,15 @@ var ErrUnavailable = errors.New("macOS helper unavailable")
 type Controller struct {
 	helperPath string
 
-	mu       sync.Mutex
-	cmd      *exec.Cmd
-	listener net.Listener
-	conn     net.Conn
-	encoder  *json.Encoder
-	tempDir  string
-	last     *Message
-	closed   bool
+	mu           sync.Mutex
+	cmd          *exec.Cmd
+	listener     net.Listener
+	conn         net.Conn
+	encoder      *json.Encoder
+	tempDir      string
+	last         *Message
+	lastSettings *Message
+	closed       bool
 
 	commands chan string
 	errors   chan error
@@ -134,9 +135,13 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 	c.conn = conn
 	c.encoder = json.NewEncoder(conn)
 	last := c.last
+	lastSettings := c.lastSettings
 	c.mu.Unlock()
 
 	_ = c.send(HelloMessage())
+	if lastSettings != nil {
+		_ = c.send(*lastSettings)
+	}
 	if last != nil {
 		_ = c.send(*last)
 	}
@@ -174,7 +179,11 @@ func (c *Controller) waitProcess(cmd *exec.Cmd) {
 
 func (c *Controller) sendOrStore(msg Message) {
 	c.mu.Lock()
-	c.last = &msg
+	if msg.Type == "settings" {
+		c.lastSettings = &msg
+	} else {
+		c.last = &msg
+	}
 	encoder := c.encoder
 	c.mu.Unlock()
 	if encoder != nil {

@@ -20,6 +20,8 @@ type Message struct {
 	DurationSeconds *float64 `json:"durationSeconds,omitempty"`
 	Volume          *int     `json:"volume,omitempty"`
 	Muted           *bool    `json:"muted,omitempty"`
+	HUDEnabled      *bool    `json:"hudEnabled,omitempty"`
+	HUDPosition     *string  `json:"hudPosition,omitempty"`
 	Command         string   `json:"command,omitempty"`
 	Text            string   `json:"message,omitempty"`
 }
