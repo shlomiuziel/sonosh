@@ -26,6 +26,10 @@ func main() {
 	if err != nil {
 		helperHUDConfigPath = ""
 	}
+	lastRoomConfigPath, err := tui.DefaultLastRoomConfigPath()
+	if err != nil {
+		lastRoomConfigPath = ""
+	}
 	carouselConfigPath, err := tui.DefaultPlaylistCarouselConfigPath()
 	if err != nil {
 		carouselConfigPath = ""
@@ -74,6 +78,7 @@ func main() {
 		Compact:             storedCompact,
 		LayoutConfigPath:    layoutConfigPath,
 		CarouselPath:        carouselConfigPath,
+		LastRoomConfigPath:  lastRoomConfigPath,
 		MacHelperPath:       *macHelperPath,
 	}
 	model := tui.NewModel(tui.NewSonosBackend(cfg.Timeout), cfg)

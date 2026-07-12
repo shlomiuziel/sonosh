@@ -36,6 +36,7 @@ type Config struct {
 	Compact             bool
 	LayoutConfigPath    string
 	CarouselPath        string
+	LastRoomConfigPath  string
 }
 
 type Model struct {
@@ -45,6 +46,7 @@ type Model struct {
 
 	rooms            []Room
 	roomIndex        int
+	lastRoom         lastRoomSelection
 	status           Status
 	artURL           string
 	artView          string
@@ -235,6 +237,10 @@ func NewModel(backend Backend, cfg Config) Model {
 	if err != nil {
 		carouselStore = defaultPlaylistCarouselStore()
 	}
+	lastRoom, err := LoadLastRoomSelection(cfg.LastRoomConfigPath)
+	if err != nil {
+		slog.Debug("tui: load last room selection failed", "err", err)
+	}
 	return Model{
 		backend:           backend,
 		config:            cfg,
@@ -246,6 +252,7 @@ func NewModel(backend Backend, cfg Config) Model {
 		compactLayout:     cfg.Compact,
 		helperHUDEnabled:  cfg.HelperHUDEnabled,
 		helperHUDPosition: normalizeHelperHUDPosition(cfg.HelperHUDPosition),
+		lastRoom:          lastRoom,
 		carouselStore:     carouselStore,
 		carouselPinned:    playlistCarouselPinnedResults(carouselStore),
 		carouselRecent:    playlistCarouselRecentResults(carouselStore),
@@ -270,14 +277,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, nil
 		}
+		previousRoom := m.selectedRoom()
 		m.rooms = msg.rooms
-		if m.roomIndex >= len(m.rooms) {
+		if idx, ok := roomIndexForSelection(m.rooms, currentLastRoomSelection(previousRoom)); ok {
+			m.roomIndex = idx
+		} else if idx, ok := roomIndexForSelection(m.rooms, m.lastRoom); ok {
+			m.roomIndex = idx
+		} else if m.roomIndex >= len(m.rooms) {
 			m.roomIndex = max(0, len(m.rooms)-1)
 		}
 		if len(m.rooms) == 0 {
 			m.message = "No Sonos rooms found"
 			return m, nil
 		}
+		m.rememberSelectedRoom()
 		m.loading = true
 		m.queueLoading = true
 		m.queueErr = nil
@@ -617,6 +630,7 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if m.roomIndex > 0 {
 			m.roomIndex--
+			m.rememberSelectedRoom()
 			m.loading = true
 			m.queueLoading = true
 			m.queueErr = nil
@@ -629,6 +643,7 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		if m.roomIndex < len(m.rooms)-1 {
 			m.roomIndex++
+			m.rememberSelectedRoom()
 			m.loading = true
 			m.queueLoading = true
 			m.queueErr = nil
@@ -1386,6 +1401,38 @@ func (m Model) selectedRoom() Room {
 		return Room{}
 	}
 	return m.rooms[m.roomIndex]
+}
+
+func (m *Model) rememberSelectedRoom() {
+	selection := currentLastRoomSelection(m.selectedRoom())
+	if selection == (lastRoomSelection{Version: 1}) {
+		return
+	}
+	m.lastRoom = selection
+	if err := SaveLastRoomSelection(m.config.LastRoomConfigPath, selection); err != nil {
+		slog.Debug("tui: save last room selection failed", "err", err)
+	}
+}
+
+func currentLastRoomSelection(room Room) lastRoomSelection {
+	return normalizeLastRoomSelection(lastRoomSelection{
+		IP:   room.IP,
+		Name: room.Name,
+	})
+}
+
+func roomIndexForSelection(rooms []Room, selection lastRoomSelection) (int, bool) {
+	for i, room := range rooms {
+		if selection.IP != "" && strings.TrimSpace(room.IP) == selection.IP {
+			return i, true
+		}
+	}
+	for i, room := range rooms {
+		if selection.Name != "" && strings.TrimSpace(room.Name) == selection.Name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (m Model) handleMacHelperCommand(command string) (tea.Model, tea.Cmd) {

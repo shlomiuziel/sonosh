@@ -1134,8 +1134,7 @@ func TestPlaylistCarouselAndSearchNavigationDoNotConflict(t *testing.T) {
 	if model.carouselIndex != 1 || model.searchIndex != 0 {
 		t.Fatalf("right in carousel changed carousel/search indexes to %d/%d", model.carouselIndex, model.searchIndex)
 	}
-	updated, _ = model.Update(key("down"))
-	model = updated.(Model)
+	_, _ = model.Update(key("down"))
 	if model.searchFocus != searchFocusResults || model.searchIndex != 0 {
 		t.Fatalf("down from carousel did not return to results: %v/%d", model.searchFocus, model.searchIndex)
 	}
@@ -1778,6 +1777,56 @@ func TestQueueFocusDispatchesActions(t *testing.T) {
 	_ = runCmd(cmd)
 	if !backend.clearedQueue {
 		t.Fatal("expected queue clear")
+	}
+}
+
+func TestModelRestoresLastRoomSelection(t *testing.T) {
+	cfg := testConfig()
+	cfg.LastRoomConfigPath = filepath.Join(t.TempDir(), "last_room.json")
+	if err := SaveLastRoomSelection(cfg.LastRoomConfigPath, lastRoomSelection{
+		IP:   "192.0.2.11",
+		Name: "Living Room",
+	}); err != nil {
+		t.Fatalf("SaveLastRoomSelection: %v", err)
+	}
+
+	model := NewModel(&fakeBackend{}, cfg)
+	updated, _ := model.Update(roomsMsg{rooms: []Room{
+		{Name: "Kitchen", IP: "192.0.2.10"},
+		{Name: "Living Room", IP: "192.0.2.11"},
+	}})
+	model = updated.(Model)
+
+	if model.roomIndex != 1 {
+		t.Fatalf("roomIndex = %d, want 1", model.roomIndex)
+	}
+	if got := model.selectedRoom().IP; got != "192.0.2.11" {
+		t.Fatalf("selected room IP = %q, want %q", got, "192.0.2.11")
+	}
+}
+
+func TestModelSavesLastRoomSelectionOnRoomChange(t *testing.T) {
+	cfg := testConfig()
+	cfg.LastRoomConfigPath = filepath.Join(t.TempDir(), "last_room.json")
+
+	model := NewModel(&fakeBackend{}, cfg)
+	updated, _ := model.Update(roomsMsg{rooms: []Room{
+		{Name: "Kitchen", IP: "192.0.2.10"},
+		{Name: "Living Room", IP: "192.0.2.11"},
+	}})
+	model = updated.(Model)
+
+	_, _ = model.Update(key("down"))
+
+	stored, err := LoadLastRoomSelection(cfg.LastRoomConfigPath)
+	if err != nil {
+		t.Fatalf("LoadLastRoomSelection: %v", err)
+	}
+	if stored.IP != "192.0.2.11" {
+		t.Fatalf("stored IP = %q, want %q", stored.IP, "192.0.2.11")
+	}
+	if stored.Name != "Living Room" {
+		t.Fatalf("stored name = %q, want %q", stored.Name, "Living Room")
 	}
 }
 
