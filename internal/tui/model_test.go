@@ -1251,8 +1251,7 @@ func TestMacHelperCommandAdjustsVolume(t *testing.T) {
 	}
 
 	model.status.Volume = 98
-	updated, cmd = model.Update(macHelperCommandMsg{command: "volumeUp"})
-	model = updated.(Model)
+	_, cmd = model.Update(macHelperCommandMsg{command: "volumeUp"})
 	if cmd == nil {
 		t.Fatal("expected volume command")
 	}

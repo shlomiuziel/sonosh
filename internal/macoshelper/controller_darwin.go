@@ -220,13 +220,13 @@ func (c *Controller) sendError(err error) {
 
 func resolveHelperPath(explicit string) (string, error) {
 	if explicit != "" {
-		if info, err := os.Stat(explicit); err == nil && !info.IsDir() {
+		if info, err := os.Stat(explicit); err == nil && !info.IsDir() { //nolint:gosec // Helper path is an explicit CLI override.
 			return explicit, nil
 		}
 		return "", fmt.Errorf("%w: %s", ErrUnavailable, explicit)
 	}
 	if env := strings.TrimSpace(os.Getenv("SONOSH_MAC_HELPER")); env != "" {
-		if info, err := os.Stat(env); err == nil && !info.IsDir() {
+		if info, err := os.Stat(env); err == nil && !info.IsDir() { //nolint:gosec // Helper path is an explicit environment override.
 			return env, nil
 		}
 		return "", fmt.Errorf("%w: %s", ErrUnavailable, env)
@@ -240,7 +240,7 @@ func resolveHelperPath(explicit string) (string, error) {
 		filepath.Join("helpers", "macos", "sonosh-helper", ".build", "release", "sonosh-macos-helper"),
 		filepath.Join("helpers", "macos", "sonosh-helper", ".build", "debug", "sonosh-macos-helper"),
 	} {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() { //nolint:gosec // Candidate paths are fixed local build outputs.
 			return candidate, nil
 		}
 	}
