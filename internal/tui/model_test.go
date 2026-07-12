@@ -1134,7 +1134,8 @@ func TestPlaylistCarouselAndSearchNavigationDoNotConflict(t *testing.T) {
 	if model.carouselIndex != 1 || model.searchIndex != 0 {
 		t.Fatalf("right in carousel changed carousel/search indexes to %d/%d", model.carouselIndex, model.searchIndex)
 	}
-	_, _ = model.Update(key("down"))
+	updated, _ = model.Update(key("down"))
+	model = updated.(Model)
 	if model.searchFocus != searchFocusResults || model.searchIndex != 0 {
 		t.Fatalf("down from carousel did not return to results: %v/%d", model.searchFocus, model.searchIndex)
 	}
