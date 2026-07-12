@@ -1388,7 +1388,7 @@ func TestViewRendersSearchSurface(t *testing.T) {
 	view := model.View()
 	for _, want := range []string{
 		"SPOTIFY / TRACKS",
-		"> mas que nada",
+		"mas que nada█",
 		"results for mas que nada",
 		"Mas Que Nada",
 		"ENTER PLAY  CTRL+T TRACKS  CTRL+P PLAYLISTS  ESC CLOSE",
