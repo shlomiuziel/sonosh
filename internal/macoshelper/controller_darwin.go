@@ -19,14 +19,15 @@ var ErrUnavailable = errors.New("macOS helper unavailable")
 type Controller struct {
 	helperPath string
 
-	mu       sync.Mutex
-	cmd      *exec.Cmd
-	listener net.Listener
-	conn     net.Conn
-	encoder  *json.Encoder
-	tempDir  string
-	last     *Message
-	closed   bool
+	mu           sync.Mutex
+	cmd          *exec.Cmd
+	listener     net.Listener
+	conn         net.Conn
+	encoder      *json.Encoder
+	tempDir      string
+	last         *Message
+	lastSettings *Message
+	closed       bool
 
 	commands chan string
 	errors   chan error
@@ -134,9 +135,13 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 	c.conn = conn
 	c.encoder = json.NewEncoder(conn)
 	last := c.last
+	lastSettings := c.lastSettings
 	c.mu.Unlock()
 
 	_ = c.send(HelloMessage())
+	if lastSettings != nil {
+		_ = c.send(*lastSettings)
+	}
 	if last != nil {
 		_ = c.send(*last)
 	}
@@ -174,7 +179,11 @@ func (c *Controller) waitProcess(cmd *exec.Cmd) {
 
 func (c *Controller) sendOrStore(msg Message) {
 	c.mu.Lock()
-	c.last = &msg
+	if msg.Type == "settings" {
+		c.lastSettings = &msg
+	} else {
+		c.last = &msg
+	}
 	encoder := c.encoder
 	c.mu.Unlock()
 	if encoder != nil {
@@ -211,13 +220,13 @@ func (c *Controller) sendError(err error) {
 
 func resolveHelperPath(explicit string) (string, error) {
 	if explicit != "" {
-		if info, err := os.Stat(explicit); err == nil && !info.IsDir() {
+		if info, err := os.Stat(explicit); err == nil && !info.IsDir() { //nolint:gosec // Helper path is an explicit CLI override.
 			return explicit, nil
 		}
 		return "", fmt.Errorf("%w: %s", ErrUnavailable, explicit)
 	}
 	if env := strings.TrimSpace(os.Getenv("SONOSH_MAC_HELPER")); env != "" {
-		if info, err := os.Stat(env); err == nil && !info.IsDir() {
+		if info, err := os.Stat(env); err == nil && !info.IsDir() { //nolint:gosec // Helper path is an explicit environment override.
 			return env, nil
 		}
 		return "", fmt.Errorf("%w: %s", ErrUnavailable, env)
@@ -231,7 +240,7 @@ func resolveHelperPath(explicit string) (string, error) {
 		filepath.Join("helpers", "macos", "sonosh-helper", ".build", "release", "sonosh-macos-helper"),
 		filepath.Join("helpers", "macos", "sonosh-helper", ".build", "debug", "sonosh-macos-helper"),
 	} {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() { //nolint:gosec // Candidate paths are fixed local build outputs.
 			return candidate, nil
 		}
 	}

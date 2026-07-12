@@ -14,7 +14,7 @@ It keeps the most common controls close to the keyboard: switch rooms, browse th
 - media and playlist browsing
 - high-quality album art rendering in the player, with block-image fallbacks when needed
 - RTL/bidirectional text rendering for right-to-left metadata in the terminal UI
-- macOS media-key binding through the Swift helper for play/pause, next, previous, and toggle
+- macOS media-key binding through the Swift helper for play/pause, next, previous, toggle, and volume up/down (volume keys require Accessibility permission)
 
 ## Sonos CLI and backend
 
