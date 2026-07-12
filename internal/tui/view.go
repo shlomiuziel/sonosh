@@ -910,17 +910,29 @@ func (m Model) searchHint() string {
 func renderSearchField(query string, width int, placeholder bool, cursorVisible bool) string {
 	innerWidth := max(8, width-8)
 	display := displayText(query, innerWidth)
-	if placeholder {
-		display = lipgloss.NewStyle().Foreground(colorMuted).Render(display)
-	} else {
-		display = lipgloss.NewStyle().Foreground(colorInk).Bold(true).Render(display)
-	}
+	cursor := ""
 	if cursorVisible {
-		cursor := lipgloss.NewStyle().
+		cursor = lipgloss.NewStyle().
 			Foreground(colorSelected).
 			Background(colorPanel).
 			Bold(true).
 			Render("█")
+	}
+	if placeholder {
+		display = lipgloss.NewStyle().
+			Foreground(colorSubtle).
+			Background(colorPanel).
+			Render(display)
+	} else {
+		display = lipgloss.NewStyle().
+			Foreground(colorInk).
+			Background(colorPanel).
+			Bold(true).
+			Render(display)
+	}
+	if placeholder {
+		display = cursor + display
+	} else if cursorVisible {
 		display += cursor
 	}
 	field := lipgloss.NewStyle().
@@ -930,7 +942,7 @@ func renderSearchField(query string, width int, placeholder bool, cursorVisible 
 		Background(colorPanel).
 		Foreground(colorInk).
 		Width(max(16, width-4)).
-		Render("> " + display)
+		Render(display)
 	return field
 }
 
