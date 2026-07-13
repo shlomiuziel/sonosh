@@ -90,7 +90,7 @@ func newFavoritesOpenCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "open [title]",
 		Short:        "Play a Sonos Favorite by title or index",
-		Long:         "Plays a Sonos Favorite by exact title match (case-insensitive) or by 1-based index from `sonos favorites list`.",
+		Long:         "Plays a Sonos Favorite by exact title match (case-insensitive) or by 1-based index from `sonosh favorites list`.",
 		SilenceUsage: true,
 		Args:         cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -150,6 +150,6 @@ func newFavoritesOpenCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&index, "index", 0, "1-based favorite index from `sonos favorites list`")
+	cmd.Flags().IntVar(&index, "index", 0, "1-based favorite index from `sonosh favorites list`")
 	return cmd
 }

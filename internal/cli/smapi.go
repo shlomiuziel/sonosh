@@ -150,7 +150,7 @@ func newSMAPICategoriesCmd(flags *rootFlags) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	return cmd
 }
 
@@ -255,13 +255,13 @@ func newSMAPIAuthBeginCmd(flags *rootFlags) *cobra.Command {
 			}
 			if res.AppURL != "" {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open this app authentication URL on a device with the service app installed:\n  %s\n", res.AppURL)
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "This AppLink response did not include a device-link code; sonoscli cannot complete token storage automatically.")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "This AppLink response did not include a device-link code; sonosh cannot complete token storage automatically.")
 				return nil
 			}
 			return errors.New("service returned no authentication URL")
 		},
 	}
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	return cmd
 }
 
@@ -343,7 +343,7 @@ func newSMAPIAuthCompleteCmd(flags *rootFlags) *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	cmd.Flags().StringVar(&linkCode, "code", "", "Link code from `sonos auth smapi begin`")
 	cmd.Flags().StringVar(&linkDeviceID, "link-device-id", "", "Optional link device id (returned by begin; usually not needed)")
 	cmd.Flags().DurationVar(&wait, "wait", 0, "Wait up to this duration for linking to complete (polls periodically)")
@@ -528,7 +528,7 @@ func newSMAPISearchCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	cmd.Flags().StringVar(&category, "category", "tracks", "Search category (service dependent, e.g. tracks|albums|artists|playlists)")
 	cmd.Flags().IntVar(&limit, "limit", 10, "Max results (1-200 depending on service)")
 	cmd.Flags().BoolVar(&doOpen, "open", false, "Open the selected result on Sonos (requires --name/--ip)")
@@ -642,7 +642,7 @@ func newSMAPIBrowseCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	cmd.Flags().StringVar(&id, "id", "root", "Container/item id to browse (default: root)")
 	cmd.Flags().IntVar(&limit, "limit", 50, "Max results")
 	cmd.Flags().BoolVar(&recursive, "recursive", false, "Recursively browse (service dependent)")

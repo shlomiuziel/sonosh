@@ -1,26 +1,26 @@
 ---
-title: sonos status
+title: sonosh status
 description: Print current playback state of a room — transport, track, time, volume, mute.
 ---
 
-# `sonos status`
+# `sonosh status`
 
-Prints coordinator status: transport state, track URI, position, volume, mute. Parses `TrackMetaData` when available to show title / artist / album / album art. Aliased as `sonos now`.
+Prints coordinator status: transport state, track URI, position, volume, mute. Parses `TrackMetaData` when available to show title / artist / album / album art. Aliased as `sonosh now`.
 
 ## Synopsis
 
 ```
-sonos status --name "<Room>" [--format plain|json|tsv]
-sonos now    --name "<Room>"
+sonosh status --name "<Room>" [--format plain|json|tsv]
+sonosh now    --name "<Room>"
 ```
 
 ## Examples
 
 ```bash
-sonos status --name "Kitchen"
-sonos now    --name "Kitchen"
-sonos status --name "Kitchen" --format json | jq -r .track.title
-sonos status --ip 10.0.0.42
+sonosh status --name "Kitchen"
+sonosh now    --name "Kitchen"
+sonosh status --name "Kitchen" --format json | jq -r .track.title
+sonosh status --ip 10.0.0.42
 ```
 
 ## What you get
@@ -40,4 +40,4 @@ In `json`, the same fields with stable keys.
 - Calls `AVTransport.GetPositionInfo`, `AVTransport.GetTransportInfo`, `RenderingControl.GetVolume`, `RenderingControl.GetMute` on the coordinator.
 - Decodes the `TrackMetaData` DIDL-Lite XML for human-readable track info.
 
-For continuous updates, prefer [`sonos watch`](sonos-watch.md) over polling.
+For continuous updates, prefer [`sonosh watch`](sonos-watch.md) over polling.

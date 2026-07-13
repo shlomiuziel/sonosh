@@ -1,16 +1,16 @@
 ---
-title: sonos discover
+title: sonosh discover
 description: Find every Sonos speaker on the local network and print name, model, and IP.
 ---
 
-# `sonos discover`
+# `sonosh discover`
 
 Sends an SSDP M-SEARCH query, then asks the first responder for the full zone topology. Falls back to a subnet scan on networks that block multicast. Names match what the Sonos app shows.
 
 ## Synopsis
 
 ```
-sonos discover [--all] [--format plain|json|tsv] [--timeout 15s]
+sonosh discover [--all] [--format plain|json|tsv] [--timeout 15s]
 ```
 
 ## Flags
@@ -24,10 +24,10 @@ Plus all [global flags](README.md).
 ## Examples
 
 ```bash
-sonos discover
-sonos discover --format json
-sonos discover --all
-sonos discover --format json | jq -r '.[].name'
+sonosh discover
+sonosh discover --format json
+sonosh discover --all
+sonosh discover --format json | jq -r '.[].name'
 ```
 
 ## How it works

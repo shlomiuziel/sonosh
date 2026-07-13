@@ -1,22 +1,22 @@
 ---
-title: sonos stop
+title: sonosh stop
 description: Stop playback on a room.
 ---
 
-# `sonos stop`
+# `sonosh stop`
 
 Sends `AVTransport.Stop` to the group coordinator. Some sources (e.g. TV input) don't support stop, in which case this becomes a no-op.
 
 ## Synopsis
 
 ```
-sonos stop --name "<Room>"
+sonosh stop --name "<Room>"
 ```
 
 ## Examples
 
 ```bash
-sonos stop --name "Kitchen"
+sonosh stop --name "Kitchen"
 ```
 
 ## Stop vs pause

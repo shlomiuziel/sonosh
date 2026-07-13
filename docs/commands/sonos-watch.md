@@ -1,16 +1,16 @@
 ---
-title: sonos watch
+title: sonosh watch
 description: Subscribe to live AVTransport and RenderingControl events from a speaker and stream changes.
 ---
 
-# `sonos watch`
+# `sonosh watch`
 
 Subscribes to UPnP eventing on the target speaker and prints state changes as they arrive. Ctrl+C to stop. Useful for debugging, dashboards, or piping into another script.
 
 ## Synopsis
 
 ```
-sonos watch --name "<Room>" [--duration 30s] [--format plain|json]
+sonosh watch --name "<Room>" [--duration 30s] [--format plain|json]
 ```
 
 ## Flags
@@ -24,9 +24,9 @@ Plus all [global flags](README.md).
 ## Examples
 
 ```bash
-sonos watch --name "Kitchen"
-sonos watch --name "Kitchen" --duration 30s
-sonos watch --name "Kitchen" --format json | jq -r '.event'
+sonosh watch --name "Kitchen"
+sonosh watch --name "Kitchen" --duration 30s
+sonosh watch --name "Kitchen" --format json | jq -r '.event'
 ```
 
 ## How it works
@@ -40,4 +40,4 @@ sonos watch --name "Kitchen" --format json | jq -r '.event'
 
 The speaker has to be able to reach **your machine** on the chosen callback port. On macOS / Windows you'll likely see a firewall prompt the first time. Allow it, or limit the rule to your Sonos VLAN.
 
-If your network blocks inbound from the Sonos subnet, eventing won't work — fall back to polling [`sonos status`](sonos-status.md).
+If your network blocks inbound from the Sonos subnet, eventing won't work — fall back to polling [`sonosh status`](sonos-status.md).

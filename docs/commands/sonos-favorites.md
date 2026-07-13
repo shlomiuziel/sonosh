@@ -1,23 +1,23 @@
 ---
-title: sonos favorites
+title: sonosh favorites
 description: List Sonos Favorites and play one by index or title.
 ---
 
-# `sonos favorites`
+# `sonosh favorites`
 
 Lists and plays Sonos Favorites — the `FV:2` container in `ContentDirectory`.
 
 ```
-sonos favorites list [--start N] [--limit N]
-sonos favorites open --name "<Room>" [<title>] [--index <n>]
+sonosh favorites list [--start N] [--limit N]
+sonosh favorites open --name "<Room>" [<title>] [--index <n>]
 ```
 
-## `sonos favorites list`
+## `sonosh favorites list`
 
 ```bash
-sonos favorites list
-sonos favorites list --limit 10
-sonos favorites list --format json | jq -r '.[].title'
+sonosh favorites list
+sonosh favorites list --limit 10
+sonosh favorites list --format json | jq -r '.[].title'
 ```
 
 | Flag | Default | What it does |
@@ -25,16 +25,16 @@ sonos favorites list --format json | jq -r '.[].title'
 | `--start int` | `0` | Starting index (0-based). |
 | `--limit int` | `50` | Max results. |
 
-## `sonos favorites open`
+## `sonosh favorites open`
 
-Plays a favorite by exact title (case-insensitive) or by 1-based index from `sonos favorites list`.
+Plays a favorite by exact title (case-insensitive) or by 1-based index from `sonosh favorites list`.
 
 ```bash
-sonos favorites open --name "Kitchen" "Morning Coffee"
-sonos favorites open --name "Kitchen" --index 3
+sonosh favorites open --name "Kitchen" "Morning Coffee"
+sonosh favorites open --name "Kitchen" --index 3
 ```
 
-Tip: for services where direct CLI search/playback is not available, such as YouTube Music, save the album or playlist as a Sonos Favorite in the Sonos app, then open that favorite from `sonoscli`.
+Tip: for services where direct CLI search/playback is not available, such as YouTube Music, save the album or playlist as a Sonos Favorite in the Sonos app, then open that favorite from `sonosh`.
 
 ## How it works
 

@@ -57,7 +57,7 @@ func newSearchSpotifyCmd(flags *rootFlags) *cobra.Command {
 		Short: "Search Spotify and print playable URIs",
 		Long: "Searches Spotify via the Spotify Web API (client credentials). " +
 			"Requires SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET (or --client-id/--client-secret). " +
-			"Prints Spotify URIs you can pass to `sonos open` / `sonos enqueue`.",
+			"Prints Spotify URIs you can pass to `sonosh open` / `sonosh enqueue`.",
 		SilenceUsage: true,
 		Args:         cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

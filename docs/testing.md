@@ -1,6 +1,6 @@
 # Testing
 
-This document is the manual + semi-automated test plan for `sonoscli`.
+This document is the manual + semi-automated test plan for `sonosh`.
 
 Goals:
 - Catch regressions in discovery/topology, grouping, and playback control.
@@ -37,24 +37,24 @@ Notes:
 
 ### 1) CLI basics
 
-- `sonos --version` prints the version (matches `internal/cli/version.go`)
-- `sonos --help` works
+- `sonosh --version` prints the version (matches `internal/cli/version.go`)
+- `sonosh --help` works
 - `sonos <cmd> --help` works for core commands (`discover`, `status`, `group`, `open`, `scene`, `smapi`)
 
 ### 2) Discovery + topology
 
 ### 2.5) Discovery (advanced)
 
-- `sonos discover --all` includes invisible/bonded devices (useful for debugging)
-- `sonos discover --format json` prints structured results
-- `sonos discover --format tsv` prints tab-separated output
+- `sonosh discover --all` includes invisible/bonded devices (useful for debugging)
+- `sonosh discover --format json` prints structured results
+- `sonosh discover --format tsv` prints tab-separated output
 
 
-- `sonos discover --timeout 6s`
+- `sonosh discover --timeout 6s`
   - Expected: prints all visible rooms (name, IP, UUID)
-- `sonos group status`
+- `sonosh group status`
   - Expected: prints group coordinators + members
-- `sonos status --name "<room>"`
+- `sonosh status --name "<room>"`
   - Expected: prints speaker metadata + playback state
 
 Regression checks:
@@ -64,24 +64,24 @@ Regression checks:
 
 ### 3.5) Config defaults
 
-- `sonos config path` prints where config is stored
-- `sonos config set defaultRoom "Office"` then run a command without `--name`/`--ip`:
-  - `sonos volume get` (should target the default room)
-- `sonos config set defaultTimeout 10s`, then `sonos --help` should show `--timeout ... (default 10s)`
-- `sonos config unset defaultTimeout`, then `sonos --help` should show `--timeout ... (default 15s)`
-- `sonos config unset defaultRoom` then run `sonos volume get` (should error and ask for `--name/--ip`)
+- `sonosh config path` prints where config is stored
+- `sonosh config set defaultRoom "Office"` then run a command without `--name`/`--ip`:
+  - `sonosh volume get` (should target the default room)
+- `sonosh config set defaultTimeout 10s`, then `sonosh --help` should show `--timeout ... (default 10s)`
+- `sonosh config unset defaultTimeout`, then `sonosh --help` should show `--timeout ... (default 15s)`
+- `sonosh config unset defaultRoom` then run `sonosh volume get` (should error and ask for `--name/--ip`)
 
 
 Pick a room:
 
-- `sonos volume get --name "<room>"`
-- `sonos mute get --name "<room>"`
-- `sonos volume set --name "<room>" 12`
-- `sonos mute on --name "<room>"`
-- `sonos mute off --name "<room>"`
+- `sonosh volume get --name "<room>"`
+- `sonosh mute get --name "<room>"`
+- `sonosh volume set --name "<room>" 12`
+- `sonosh mute on --name "<room>"`
+- `sonosh mute off --name "<room>"`
 
 Expected:
-- Values change immediately and `sonos status` reflects the new values.
+- Values change immediately and `sonosh status` reflects the new values.
 
 ### 4) Grouping controls
 
@@ -89,56 +89,56 @@ Expected:
 
 Create a small temporary group (recommended: join `Pantry` to `Office`) and validate group-wide controls:
 
-- `sonos group join --name Pantry --to Office`
-- `sonos group volume get --name Office`
-- `sonos group volume set --name Office 18`
-- `sonos group mute toggle --name Office` (twice to return to original)
-- `sonos group dissolve --name Office` (splits the test group)
+- `sonosh group join --name Pantry --to Office`
+- `sonosh group volume get --name Office`
+- `sonosh group volume set --name Office 18`
+- `sonosh group mute toggle --name Office` (twice to return to original)
+- `sonosh group dissolve --name Office` (splits the test group)
 
 
 Pick a coordinator room and a second room:
 
-- `sonos group join --name "<member>" --to "<coordinator>"`
-- `sonos group status` shows member under coordinator
-- `sonos group unjoin --name "<member>"`
-- `sonos group status` shows member as its own coordinator
+- `sonosh group join --name "<member>" --to "<coordinator>"`
+- `sonosh group status` shows member under coordinator
+- `sonosh group unjoin --name "<member>"`
+- `sonosh group status` shows member as its own coordinator
 
 Optional:
-- `sonos group party --name "<coordinator>"` (joins all visible rooms)
-- `sonos group dissolve --name "<coordinator>"` (ungroups all members)
-- `sonos group solo --name "<room>"` (ensures it plays by itself)
+- `sonosh group party --name "<coordinator>"` (joins all visible rooms)
+- `sonosh group dissolve --name "<coordinator>"` (ungroups all members)
+- `sonosh group solo --name "<room>"` (ensures it plays by itself)
 
 ### 5) Inputs (TV/Line-in)
 
 TV input (soundbars/home theater):
 - Ensure the target is the *soundbar* (e.g. `Living Room`) and it is a standalone coordinator:
-  - `sonos group solo --name "<soundbar room>"`
-- `sonos tv --name "<soundbar room>"`
-- `sonos status --name "<soundbar room>"` should show a URI like `x-sonos-htastream:<UUID>:spdif`
+  - `sonosh group solo --name "<soundbar room>"`
+- `sonosh tv --name "<soundbar room>"`
+- `sonosh status --name "<soundbar room>"` should show a URI like `x-sonos-htastream:<UUID>:spdif`
 
 Line-in (devices with analog-in, e.g. Sonos Five):
-- `sonos linein --name "<room>"` (defaults `--from` to the same room)
-- `sonos status --name "<room>"` should show a URI like `x-rincon-stream:<UUID>`
+- `sonosh linein --name "<room>"` (defaults `--from` to the same room)
+- `sonosh status --name "<room>"` should show a URI like `x-rincon-stream:<UUID>`
 
 ### 6) Spotify playback (no Spotify Web API creds)
 
 This uses Sonos queueing (AVTransport) + Spotify share links.
 
-- `sonos open --name "<room>" "https://open.spotify.com/track/<id>"`
-- `sonos open --name "<room>" "https://open.spotify.com/album/<id>"`
-- `sonos enqueue --name "<room>" "spotify:track:<id>"`
-- `sonos next --name "<room>"`
-- `sonos pause --name "<room>"`
-- `sonos play --name "<room>"`
-- `sonos stop --name "<room>"`
+- `sonosh open --name "<room>" "https://open.spotify.com/track/<id>"`
+- `sonosh open --name "<room>" "https://open.spotify.com/album/<id>"`
+- `sonosh enqueue --name "<room>" "spotify:track:<id>"`
+- `sonosh next --name "<room>"`
+- `sonosh pause --name "<room>"`
+- `sonosh play --name "<room>"`
+- `sonosh stop --name "<room>"`
 
 Expected:
-- Playback starts, track info updates in `sonos status`
+- Playback starts, track info updates in `sonosh status`
 
 ### 7) Queue management
 
-- `sonos queue list --name "<room>"`
-- `sonos queue clear --name "<room>"`
+- `sonosh queue list --name "<room>"`
+- `sonosh queue clear --name "<room>"`
 
 Expected:
 - List shows items when queue is in use
@@ -148,18 +148,18 @@ Expected:
 
 Scenes should only include *visible* rooms (not bonded satellites/subs).
 
-- `sonos scene save __tmp_test`
-- `sonos scene apply __tmp_test`
-- `sonos scene list`
-- `sonos scene delete __tmp_test`
+- `sonosh scene save __tmp_test`
+- `sonosh scene apply __tmp_test`
+- `sonosh scene list`
+- `sonosh scene delete __tmp_test`
 
 Expected:
 - No `soap http 500` errors on systems with home theater / stereo bonded devices.
 
 ### 9) Sonos Favorites
 
-- `sonos favorites list --name "<room>" --timeout 10s`
-- `sonos favorites open --name "<room>" --index 1`
+- `sonosh favorites list --name "<room>" --timeout 10s`
+- `sonosh favorites open --name "<room>" --index 1`
 
 Expected:
 - Lists favorites; plays selected item (if any exist).
@@ -168,13 +168,13 @@ Expected:
 
 SMAPI is Sonos-side browsing/search for linked services (e.g. Spotify). It may require a one-time DeviceLink/AppLink auth flow.
 
-- `sonos smapi services`
-- `sonos smapi categories --service "Spotify"`
-- `sonos smapi search --service "Spotify" --category tracks "miles davis"`
+- `sonosh smapi services`
+- `sonosh smapi categories --service "Spotify"`
+- `sonosh smapi search --service "Spotify" --category tracks "miles davis"`
 
 If auth is required:
-- `sonos auth smapi begin --service "Spotify"` (follow the `regUrl` and link code)
-- `sonos auth smapi complete --service "Spotify" --code "<linkCode>" --wait 2m`
+- `sonosh auth smapi begin --service "Spotify"` (follow the `regUrl` and link code)
+- `sonosh auth smapi complete --service "Spotify" --code "<linkCode>" --wait 2m`
 - Some AppLink services, such as Apple Music, may return a native app URL without a device-link code; verify the command reports that clearly instead of printing empty completion instructions.
 
 Expected:
@@ -185,9 +185,9 @@ Expected:
 
 Use a room you can interrupt. The command starts a short-lived local daemon and returns after Sonos accepts the stream.
 
-- `sonos play-url --name "<room>" "https://www.youtube.com/watch?v=-n_rdQIVahw"`
-- `sonos play-url --name "<room>" "https://example.com/podcast/episode.mp3"`
-- `sonos play-url --name "<room>" --playlist-limit 2 "https://music.youtube.com/playlist?list=PL..."`
+- `sonosh play-url --name "<room>" "https://www.youtube.com/watch?v=-n_rdQIVahw"`
+- `sonosh play-url --name "<room>" "https://example.com/podcast/episode.mp3"`
+- `sonosh play-url --name "<room>" --playlist-limit 2 "https://music.youtube.com/playlist?list=PL..."`
 
 Expected:
 - Single URLs start playback through a local `http://<local-ip>:<port>/Sonos%20CLI.mp3` proxy.
@@ -197,7 +197,7 @@ Expected:
 
 ### 12) Event watching (manual)
 
-- `sonos watch --name "<room>" --duration 15s` (or omit `--duration` and Ctrl+C)
+- `sonosh watch --name "<room>" --duration 15s` (or omit `--duration` and Ctrl+C)
 - Change volume / skip track in another controller/app.
 
 Expected:
@@ -205,10 +205,10 @@ Expected:
 
 ### 13) Shell completions
 
-- `sonos completion zsh`
-- `sonos completion bash`
-- `sonos completion fish`
-- `sonos completion powershell`
+- `sonosh completion zsh`
+- `sonosh completion bash`
+- `sonosh completion fish`
+- `sonosh completion powershell`
 
 Expected: prints a completion script to stdout.
 
@@ -221,50 +221,50 @@ Fill this in when doing an end-to-end run.
 - Network: `192.168.0.0/24`
 - Discovery result (rooms found): `Bar, Bedroom, Hallway, Kitchen, Living Room, Master Bathroom, Office, Pantry`
 - Notes/issues:
-  - Verified: `sonos --version` prints `0.1.27`.
-  - Verified: `sonos discover --timeout 6s` finds all expected rooms; `sonos discover --all --format tsv` includes bonded/hidden devices; `sonos discover --format json` prints a JSON array.
+  - Verified: `sonosh --version` prints `0.1.27`.
+  - Verified: `sonosh discover --timeout 6s` finds all expected rooms; `sonosh discover --all --format tsv` includes bonded/hidden devices; `sonosh discover --format json` prints a JSON array.
   - Verified: Config defaults:
-    - `sonos config set defaultRoom Office` makes `sonos volume get` work without `--name`/`--ip`.
-    - `sonos config set format tsv` affects default output format; reset to `plain` after.
+    - `sonosh config set defaultRoom Office` makes `sonosh volume get` work without `--name`/`--ip`.
+    - `sonosh config set format tsv` affects default output format; reset to `plain` after.
   - Verified: Spotify playback on Office:
-    - `sonos group solo --name Office` isolates `Office` for playback.
-    - `sonos open --name Office https://open.spotify.com/album/4o9BvaaFDTBLFxzK70GT1E?...` starts playback.
-    - `sonos queue list/play/remove/clear --name Office` works.
+    - `sonosh group solo --name Office` isolates `Office` for playback.
+    - `sonosh open --name Office https://open.spotify.com/album/4o9BvaaFDTBLFxzK70GT1E?...` starts playback.
+    - `sonosh queue list/play/remove/clear --name Office` works.
   - Verified: Group controls:
-    - `sonos group join --name Pantry --to Office`
-    - `sonos group volume get/set --name Office`, `sonos group mute toggle --name Office`, `sonos group dissolve --name Office`
+    - `sonosh group join --name Pantry --to Office`
+    - `sonosh group volume get/set --name Office`, `sonosh group mute toggle --name Office`, `sonosh group dissolve --name Office`
   - Verified: Scenes:
-    - `sonos scene save/apply/list/delete __tmp_test` works.
+    - `sonosh scene save/apply/list/delete __tmp_test` works.
   - Verified: Favorites:
-    - `sonos favorites list --name Office` and `sonos favorites open --name Office --index 1` work.
+    - `sonosh favorites list --name Office` and `sonosh favorites open --name Office --index 1` work.
   - Verified: SMAPI / Spotify search:
-    - `sonos smapi services` and `sonos smapi search --service Spotify --category tracks "miles davis"` work.
-    - `sonos smapi search --open --name Office --index 1 "miles davis"` starts playback.
-    - `sonos smapi browse --service Spotify --id root` works (drill into returned container ids).
-  - Verified: `sonos group unjoin --name Pantry` removes it from the Bar group (restored afterward).
+    - `sonosh smapi services` and `sonosh smapi search --service Spotify --category tracks "miles davis"` work.
+    - `sonosh smapi search --open --name Office --index 1 "miles davis"` starts playback.
+    - `sonosh smapi browse --service Spotify --id root` works (drill into returned container ids).
+  - Verified: `sonosh group unjoin --name Pantry` removes it from the Bar group (restored afterward).
   - Verified: Mute toggle:
-    - `sonos mute toggle --name Office` flips mute state and `sonos mute get` reflects it.
+    - `sonosh mute toggle --name Office` flips mute state and `sonosh mute get` reflects it.
   - Verified: Play URI (radio):
-    - `sonos play-uri --name Office --radio http://stream.radioparadise.com/mp3-192` starts playback (URI shows `x-rincon-mp3radio://...`).
+    - `sonosh play-uri --name Office --radio http://stream.radioparadise.com/mp3-192` starts playback (URI shows `x-rincon-mp3radio://...`).
     - Note: Some public streams may not play (depends on codec/redirects/Sonos support).
   - Verified: Watch:
-    - `sonos watch --name Office --duration 6s --format tsv` reports `volume_master` changes when volume is adjusted during the watch window.
-    - `sonos watch --name Office --duration 4s --format json` prints one JSON object per event line.
+    - `sonosh watch --name Office --duration 6s --format tsv` reports `volume_master` changes when volume is adjusted during the watch window.
+    - `sonosh watch --name Office --duration 4s --format json` prints one JSON object per event line.
   - Verified: Shell completions:
-    - `sonos completion zsh|bash|fish|powershell` prints completion scripts.
+    - `sonosh completion zsh|bash|fish|powershell` prints completion scripts.
   - Verified: Spotify Web API search errors clearly without credentials:
-    - `sonos search spotify "miles davis"` prints a “missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET” error.
+    - `sonosh search spotify "miles davis"` prints a “missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET” error.
   - Verified: JSON output:
-    - `sonos --format json discover` prints a JSON array.
-    - `sonos --format json queue list --name Office` prints a JSON object with `items`.
-  - Verified: `sonos discover --timeout 10ms` now returns a clear error (non-zero exit) when no speakers are found; `--format json` still prints `[]`.
+    - `sonosh --format json discover` prints a JSON array.
+    - `sonosh --format json queue list --name Office` prints a JSON object with `items`.
+  - Verified: `sonosh discover --timeout 10ms` now returns a clear error (non-zero exit) when no speakers are found; `--format json` still prints `[]`.
   - Verified: Group party/dissolve:
-    - `sonos group party --to Bar` joins all rooms into the Bar group.
-    - `sonos group dissolve --name Bar` returns rooms to standalone coordinators.
+    - `sonosh group party --to Bar` joins all rooms into the Bar group.
+    - `sonosh group dissolve --name Bar` returns rooms to standalone coordinators.
   - Verified: Enqueue does not start playback:
-    - `sonos stop --name Office` then `sonos enqueue --name Office spotify:track:...` keeps `State: STOPPED`.
-    - `sonos queue play --name Office 1` starts playback.
+    - `sonosh stop --name Office` then `sonosh enqueue --name Office spotify:track:...` keeps `State: STOPPED`.
+    - `sonosh queue play --name Office 1` starts playback.
   - Verified: Volume boundaries:
-    - `sonos volume set --name Office 0` and `sonos volume set --name Office 100` work and reflect in `sonos volume get`.
-    - `sonos group volume set --name Office 0|100` works on a temporary `Office+Pantry` group.
-  - Restored original state via `sonos --timeout 25s scene apply/delete __restore_continued_testing_2025_12_13_b`.
+    - `sonosh volume set --name Office 0` and `sonosh volume set --name Office 100` work and reflect in `sonosh volume get`.
+    - `sonosh group volume set --name Office 0|100` works on a temporary `Office+Pantry` group.
+  - Restored original state via `sonosh --timeout 25s scene apply/delete __restore_continued_testing_2025_12_13_b`.

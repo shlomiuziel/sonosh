@@ -1,91 +1,91 @@
 ---
-title: sonos group
+title: sonosh group
 description: Inspect grouping, join/unjoin rooms, party-mode the house, and adjust group volume / mute.
 ---
 
-# `sonos group`
+# `sonosh group`
 
 Inspect and control grouping. Sub-commands:
 
 ```
-sonos group status
-sonos group join     --name "<Member>"  --to "<Coordinator>"
-sonos group unjoin   --name "<Member>"
-sonos group dissolve --name "<AnyInGroup>"
-sonos group party    --to "<Coordinator>"
-sonos group solo     --name "<Room>"
-sonos group volume   get|set …
-sonos group mute     on|off|toggle|get
+sonosh group status
+sonosh group join     --name "<Member>"  --to "<Coordinator>"
+sonosh group unjoin   --name "<Member>"
+sonosh group dissolve --name "<AnyInGroup>"
+sonosh group party    --to "<Coordinator>"
+sonosh group solo     --name "<Room>"
+sonosh group volume   get|set …
+sonosh group mute     on|off|toggle|get
 ```
 
-## `sonos group status`
+## `sonosh group status`
 
 Shows current groups and members.
 
 ```bash
-sonos group status
-sonos group status --all       # include invisible / bonded devices
-sonos group status --format json
+sonosh group status
+sonosh group status --all       # include invisible / bonded devices
+sonosh group status --format json
 ```
 
-## `sonos group join`
+## `sonosh group join`
 
 Makes the target speaker join the group coordinated by `--to`.
 
 ```bash
-sonos group join --name "Kitchen" --to "Living Room"
+sonosh group join --name "Kitchen" --to "Living Room"
 ```
 
-## `sonos group unjoin`
+## `sonosh group unjoin`
 
 Makes the target speaker become a standalone coordinator.
 
 ```bash
-sonos group unjoin --name "Kitchen"
+sonosh group unjoin --name "Kitchen"
 ```
 
-## `sonos group dissolve`
+## `sonosh group dissolve`
 
 Makes every member of the target's group standalone.
 
 ```bash
-sonos group dissolve --name "Living Room"
+sonosh group dissolve --name "Living Room"
 ```
 
-## `sonos group party`
+## `sonosh group party`
 
 Makes every visible speaker join the group coordinated by `--to`. Drops anyone already grouped elsewhere first.
 
 ```bash
-sonos group party --to "Living Room"
+sonosh group party --to "Living Room"
 ```
 
-## `sonos group solo`
+## `sonosh group solo`
 
 Ungroups every other member of the target's group, leaving the target as a standalone coordinator. The inverse of `party`.
 
 ```bash
-sonos group solo --name "Office"
+sonosh group solo --name "Office"
 ```
 
-## `sonos group volume`
+## `sonosh group volume`
 
 Controls the group fader, which scales every member proportionally (0–100).
 
 ```bash
-sonos group volume get --name "Living Room"
-sonos group volume set --name "Living Room" 18
+sonosh group volume get --name "Living Room"
+sonosh group volume set --name "Living Room" 18
 ```
 
-## `sonos group mute`
+## `sonosh group mute`
 
 Mutes / unmutes the entire group (every member at once).
 
 ```bash
-sonos group mute on     --name "Living Room"
-sonos group mute off    --name "Living Room"
-sonos group mute toggle --name "Living Room"
-sonos group mute get    --name "Living Room"
+sonosh group mute on     --name "Living Room"
+sonosh group mute off    --name "Living Room"
+sonosh group mute toggle --name "Living Room"
+sonosh group mute get    --name "Living Room"
 ```
 
 ## How it works

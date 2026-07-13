@@ -1,16 +1,16 @@
 ---
-title: sonos search spotify
+title: sonosh search spotify
 description: Search Spotify directly via the Spotify Web API (client credentials) and optionally play / enqueue the result on Sonos.
 ---
 
-# `sonos search spotify`
+# `sonosh search spotify`
 
-Searches Spotify via the Spotify Web API (client credentials). Requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` (or the matching flags). Prints Spotify URIs you can hand to [`sonos open`](sonos-open.md) / [`sonos enqueue`](sonos-enqueue.md), or have the command play directly.
+Searches Spotify via the Spotify Web API (client credentials). Requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` (or the matching flags). Prints Spotify URIs you can hand to [`sonosh open`](sonos-open.md) / [`sonosh enqueue`](sonos-enqueue.md), or have the command play directly.
 
 ## Synopsis
 
 ```
-sonos search spotify <query> [flags]
+sonosh search spotify <query> [flags]
 ```
 
 ## Flags
@@ -33,18 +33,18 @@ export SPOTIFY_CLIENT_ID=…
 export SPOTIFY_CLIENT_SECRET=…
 
 # Just print URIs
-sonos search spotify "miles davis" --type album --limit 5
+sonosh search spotify "miles davis" --type album --limit 5
 
 # Pick result #2 and play on Sonos
-sonos search spotify "blue train" --type album --index 2 --open --name "Kitchen"
+sonosh search spotify "blue train" --type album --index 2 --open --name "Kitchen"
 
 # Enqueue without playing
-sonos search spotify "deep focus" --type playlist --enqueue --name "Kitchen"
+sonosh search spotify "deep focus" --type playlist --enqueue --name "Kitchen"
 ```
 
 ## When to use this vs SMAPI
 
-Prefer [`sonos play spotify`](sonos-play-spotify.md) (SMAPI) if you don't need Spotify-specific filters — it works with the credentials Sonos already has.
+Prefer [`sonosh play spotify`](sonos-play-spotify.md) (SMAPI) if you don't need Spotify-specific filters — it works with the credentials Sonos already has.
 
 Reach for `search spotify` when you specifically need:
 

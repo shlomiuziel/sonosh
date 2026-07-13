@@ -1,22 +1,22 @@
 ---
-title: sonos prev
+title: sonosh prev
 description: Go to the previous track in the queue.
 ---
 
-# `sonos prev`
+# `sonosh prev`
 
 Sends `AVTransport.Previous` to the group coordinator. If the source rejects previous (common for some streams), it restarts the current track instead.
 
 ## Synopsis
 
 ```
-sonos prev --name "<Room>"
+sonosh prev --name "<Room>"
 ```
 
 ## Examples
 
 ```bash
-sonos prev --name "Kitchen"
+sonosh prev --name "Kitchen"
 ```
 
 ## Behavior detail

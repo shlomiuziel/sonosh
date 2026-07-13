@@ -7,7 +7,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/sonos ./cmd/sonos
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/sonosh ./cmd/sonosh
 
 FROM python:3.12-slim
 RUN apt-get update \
@@ -15,14 +15,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir yt-dlp \
-    && useradd --create-home --home-dir /data --uid 10001 sonos
+    && useradd --create-home --home-dir /data --uid 10001 sonosh
 ENV HOME=/data \
     XDG_CONFIG_HOME=/data/config \
     XDG_CACHE_HOME=/data/cache \
     XDG_STATE_HOME=/data/state
 VOLUME ["/data"]
 WORKDIR /data
-COPY --from=build /out/sonos /usr/local/bin/sonos
-USER sonos
-ENTRYPOINT ["sonos"]
+COPY --from=build /out/sonosh /usr/local/bin/sonosh
+USER sonosh
+ENTRYPOINT ["sonosh"]
 CMD ["--help"]

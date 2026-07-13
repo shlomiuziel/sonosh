@@ -154,7 +154,7 @@ func newPlaySpotifyCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonos smapi services`)")
+	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
 	cmd.Flags().StringVar(&category, "category", "tracks", "SMAPI search category (try: tracks, albums, playlists)")
 	cmd.Flags().IntVar(&index, "index", 0, "Result index to play (0-based)")
 	cmd.Flags().BoolVar(&enqueueOnly, "enqueue", false, "Only enqueue (do not start playback)")

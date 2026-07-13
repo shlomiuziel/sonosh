@@ -1,14 +1,14 @@
 version: 2
 
-project_name: sonoscli
+project_name: sonosh
 
 changelog:
   disable: true
 
 builds:
-  - id: sonos
-    main: ./cmd/sonos
-    binary: sonos
+  - id: sonosh
+    main: ./cmd/sonosh
+    binary: sonosh
     env:
       - CGO_ENABLED=0
     targets:
@@ -20,10 +20,10 @@ builds:
       - windows_arm64
 
 universal_binaries:
-  - id: sonos
+  - id: sonosh
     ids:
       - sonos
-    name_template: sonos
+    name_template: sonosh
     replace: false
 
 archives:
