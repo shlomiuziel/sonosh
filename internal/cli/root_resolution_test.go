@@ -54,7 +54,7 @@ func TestExecute_Version(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if !strings.Contains(buf.String(), "sonos ") {
+	if !strings.Contains(buf.String(), "sonosh ") {
 		t.Fatalf("unexpected output: %q", buf.String())
 	}
 }

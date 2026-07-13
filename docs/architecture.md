@@ -1,16 +1,16 @@
 ---
 title: Architecture
-description: How sonoscli is organized — packages, command flow, coordinator resolution, and the SOAP client.
+description: How sonosh is organized — packages, command flow, coordinator resolution, and the SOAP client.
 ---
 
 # Architecture
 
-`sonoscli` is a small Go binary that speaks Sonos's UPnP/SOAP dialect over the LAN. It is built from a handful of packages that you can read in one sitting.
+`sonosh` is a small Go binary that speaks Sonos's UPnP/SOAP dialect over the LAN. It is built from a handful of packages that you can read in one sitting.
 
 ## Package layout
 
 ```
-cmd/sonos/                 # main entrypoint (just calls into internal/cli)
+cmd/sonosh/                 # main entrypoint (just calls into internal/cli)
 internal/cli/              # Cobra commands, flag plumbing, output formatting
 internal/sonos/            # SOAP client, SSDP, topology, AVTransport, ContentDirectory, RenderingControl
 internal/spotify/          # Optional Spotify Web API client (client credentials only)
@@ -33,7 +33,7 @@ Every command follows the same path:
 
 ## Topology is the source of truth
 
-Sonos exposes the real grouping state via `ZoneGroupTopology.GetZoneGroupState`, which returns an XML blob that lists every zone, its coordinator, members, and bonded satellites. `sonoscli`:
+Sonos exposes the real grouping state via `ZoneGroupTopology.GetZoneGroupState`, which returns an XML blob that lists every zone, its coordinator, members, and bonded satellites. `sonosh`:
 
 - Treats topology — not SSDP — as canonical for the room list.
 - Filters bonded satellites and stereo-pair secondaries from default output (use `--all` to include them).
@@ -54,11 +54,11 @@ Only the actions actually needed by the CLI are wired up. Adding a new action is
 
 ## Eventing
 
-`sonos watch` uses UPnP eventing (GENA): it starts a small HTTP server, sends `SUBSCRIBE` requests for `AVTransport` and `RenderingControl`, and re-renders state changes as they stream in. The callback URL must be reachable from the speaker, which is why your firewall may prompt on first run.
+`sonosh watch` uses UPnP eventing (GENA): it starts a small HTTP server, sends `SUBSCRIBE` requests for `AVTransport` and `RenderingControl`, and re-renders state changes as they stream in. The callback URL must be reachable from the speaker, which is why your firewall may prompt on first run.
 
 ## Stream proxy
 
-`sonos play-url` starts a detached local daemon for web audio. The foreground command resolves the target speaker, chooses a LAN-reachable local IP, writes a one-shot proxy config, waits for a tokenized health check, then points Sonos at the generated `http://<local-ip>:<port>/...mp3` URL.
+`sonosh play-url` starts a detached local daemon for web audio. The foreground command resolves the target speaker, chooses a LAN-reachable local IP, writes a one-shot proxy config, waits for a tokenized health check, then points Sonos at the generated `http://<local-ip>:<port>/...mp3` URL.
 
 The daemon keeps Sonos on a simple MP3 stream while your machine handles the messy side:
 
@@ -81,7 +81,7 @@ Errors always go to stderr with a non-zero exit code. `--debug` adds a structure
 
 ## Configuration
 
-Local defaults live at `~/.config/sonoscli/config.json` (or the platform equivalent). The file is small on purpose — `sonos config get|set|unset|path` is the only supported way to write it.
+Local defaults live at `~/.config/sonoscli/config.json` (or the platform equivalent). The file is small on purpose — `sonosh config get|set|unset|path` is the only supported way to write it.
 
 ## Scenes
 

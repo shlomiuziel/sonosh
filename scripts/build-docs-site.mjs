@@ -592,7 +592,7 @@ function navHtml(currentPage) {
 function navTitle(page, sectionName) {
   if (page.rel === "index.md") return "Overview";
   if (page.rel === "commands/README.md") return "Command Index";
-  if (sectionName === "Commands" && page.title.startsWith("sonos ")) return page.title;
+  if (sectionName === "Commands" && page.title.startsWith("sonosh ")) return page.title;
   return page.title;
 }
 

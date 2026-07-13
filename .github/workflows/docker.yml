@@ -16,13 +16,13 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Build image
-        run: docker build --pull -t sonoscli:ci .
+        run: docker build --pull -t sonosh:ci .
 
       - name: Smoke test image
         run: |
           set -euo pipefail
-          docker run --rm sonoscli:ci --version
-          docker run --rm sonoscli:ci --help
-          docker run --rm --entrypoint ffmpeg sonoscli:ci -version
-          docker run --rm --entrypoint yt-dlp sonoscli:ci --version
-          docker run --rm --entrypoint curl sonoscli:ci --version
+          docker run --rm sonosh:ci --version
+          docker run --rm sonosh:ci --help
+          docker run --rm --entrypoint ffmpeg sonosh:ci -version
+          docker run --rm --entrypoint yt-dlp sonosh:ci --version
+          docker run --rm --entrypoint curl sonosh:ci --version

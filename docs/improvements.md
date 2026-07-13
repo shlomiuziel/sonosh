@@ -1,6 +1,6 @@
 # Improvements / Roadmap
 
-This is a living list of potential improvements to `sonoscli`, captured from current gaps vs. typical Sonos controller features. Use it as a backlog; we’ll implement items one-by-one.
+This is a living list of potential improvements to `sonosh`, captured from current gaps vs. typical Sonos controller features. Use it as a backlog; we’ll implement items one-by-one.
 
 Legend:
 - **Value**: user-facing impact (High/Med/Low)
@@ -12,10 +12,10 @@ Legend:
 1) **Queue management**
 - Value: High | Effort: M | Deps: none
 - Add commands:
-  - `sonos queue list --name "<Room>" [--limit N] [--json]`
-  - `sonos queue clear --name "<Room>"`
-  - `sonos queue play --name "<Room>" <index>` (0-based or 1-based, pick one and document)
-  - `sonos queue remove --name "<Room>" <index>`
+  - `sonosh queue list --name "<Room>" [--limit N] [--json]`
+  - `sonosh queue clear --name "<Room>"`
+  - `sonosh queue play --name "<Room>" <index>` (0-based or 1-based, pick one and document)
+  - `sonosh queue remove --name "<Room>" <index>`
 - Notes:
   - Uses UPnP `ContentDirectory.Browse` (queue container `Q:0`) and `AVTransport.RemoveTrackFromQueue` / `RemoveAllTracksFromQueue` / `Seek TRACK_NR`.
  - Status:
@@ -23,19 +23,19 @@ Legend:
 
 2) **Better “now playing” metadata**
 - Value: High | Effort: M | Deps: none
-- Improve `sonos status`:
+- Improve `sonosh status`:
   - Parse `TrackMetaData` DIDL and show `title`, `artist`, `album`, `albumArtURI` (when available).
-  - Optionally add `sonos now` as a friendlier alias.
+  - Optionally add `sonosh now` as a friendlier alias.
 - Notes:
   - Requires DIDL parsing (we can implement a small subset rather than full DIDL).
  - Status:
-   - Implemented in `0.1.4` (adds `sonos now` alias and prints parsed metadata when present).
+   - Implemented in `0.1.4` (adds `sonosh now` alias and prints parsed metadata when present).
 
 3) **Group volume + group mute**
 - Value: High | Effort: S–M | Deps: none
 - Add:
-  - `sonos group volume get|set --name "<AnyMember>" <0-100>`
-  - `sonos group mute get|on|off|toggle --name "<AnyMember>"`
+  - `sonosh group volume get|set --name "<AnyMember>" <0-100>`
+  - `sonosh group mute get|on|off|toggle --name "<AnyMember>"`
 - Notes:
   - Uses `GroupRenderingControl` service (similar to SoCo patterns).
  - Status:
@@ -44,9 +44,9 @@ Legend:
 4) **Presets / scenes**
 - Value: High | Effort: L | Deps: none
 - Add:
-  - `sonos scene save <name>`: capture grouping + volumes (+ optionally what’s playing)
-  - `sonos scene apply <name>`
-  - `sonos scene list`
+  - `sonosh scene save <name>`: capture grouping + volumes (+ optionally what’s playing)
+  - `sonosh scene apply <name>`
+  - `sonosh scene list`
 - Notes:
   - Needs a config store (file under `~/.config/sonoscli` or similar).
  - Status:
@@ -57,8 +57,8 @@ Legend:
 5) **Music sources (Sonos Favorites)**
 - Value: Med–High | Effort: M | Deps: favorites must exist
 - Add:
-  - `sonos favorites list [--json]`
-  - `sonos favorites open --name "<Room>" "<favorite title>"` (or by index)
+  - `sonosh favorites list [--json]`
+  - `sonosh favorites open --name "<Room>" "<favorite title>"` (or by index)
 - Notes:
   - Favorites are available via `ContentDirectory.Browse` (e.g. `FV:2`), and often include metadata needed to play.
  - Status:
@@ -67,9 +67,9 @@ Legend:
 6) **Music sources (radio / TuneIn / URI play)**
 - Value: Med | Effort: M | Deps: depends on source
 - Add:
-  - `sonos play-uri --name "<Room>" "<uri>" [--title "..."] [--radio]`
-  - `sonos linein --name "<Room>" [--from "<RoomWithLineIn>"]`
-  - `sonos tv --name "<Room>"`
+  - `sonosh play-uri --name "<Room>" "<uri>" [--title "..."] [--radio]`
+  - `sonosh linein --name "<Room>" [--from "<RoomWithLineIn>"]`
+  - `sonosh tv --name "<Room>"`
  - Status:
    - Implemented in `0.1.8`.
 
@@ -95,7 +95,7 @@ Legend:
 9) **Event subscriptions + watch mode**
 - Value: Med | Effort: L | Deps: network accessibility to event listener port
 - Add:
-  - `sonos watch --name "<Room>"` (stream live changes: track/volume/transport)
+  - `sonosh watch --name "<Room>"` (stream live changes: track/volume/transport)
 - Notes:
   - Requires UPnP eventing server on the CLI machine and subscriptions to `AVTransport`/`RenderingControl`.
  - Status:
@@ -108,18 +108,18 @@ Legend:
 - Notes:
   - This is more complex and service-dependent.
  - Status:
-   - Implemented in `0.1.12` as `sonos smapi ...` (services list + DeviceLink/AppLink auth + search).
+   - Implemented in `0.1.12` as `sonosh smapi ...` (services list + DeviceLink/AppLink auth + search).
 
 11) **Credential/config management**
 - Value: Med | Effort: M | Deps: none
 - Add:
-  - `sonos config set spotify.client_id ...`
+  - `sonosh config set spotify.client_id ...`
   - Store secrets in Keychain (macOS) or an encrypted local store; fallback to env vars.
 
 ## What needs the Spotify Web API?
 
 - Required:
-  - `sonos search spotify ...` (human query → IDs/URIs)
+  - `sonosh search spotify ...` (human query → IDs/URIs)
   - Rich metadata (covers/artist lists) even when Sonos doesn’t provide it cleanly
 - Not required:
-  - `sonos open/enqueue` for Spotify when you already have a Spotify URI/share link and Spotify is linked in the Sonos app.
+  - `sonosh open/enqueue` for Spotify when you already have a Spotify URI/share link and Spotify is linked in the Sonos app.

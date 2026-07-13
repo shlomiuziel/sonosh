@@ -17,7 +17,7 @@ func newAuthSMAPICmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "smapi",
 		Short: "Authenticate a Sonos music service (SMAPI DeviceLink/AppLink)",
-		Long:  "Authenticate a Sonos music service for SMAPI browsing/search (DeviceLink/AppLink). This is required for some services (e.g. Spotify) before `sonos smapi search` works.",
+		Long:  "Authenticate a Sonos music service for SMAPI browsing/search (DeviceLink/AppLink). This is required for some services (e.g. Spotify) before `sonosh smapi search` works.",
 	}
 
 	cmd.AddCommand(newSMAPIAuthBeginCmd(flags))

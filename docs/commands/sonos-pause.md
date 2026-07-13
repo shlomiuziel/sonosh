@@ -1,23 +1,23 @@
 ---
-title: sonos pause
+title: sonosh pause
 description: Pause playback on a room.
 ---
 
-# `sonos pause`
+# `sonosh pause`
 
 Sends `AVTransport.Pause` to the group coordinator.
 
 ## Synopsis
 
 ```
-sonos pause --name "<Room>"
+sonosh pause --name "<Room>"
 ```
 
 ## Examples
 
 ```bash
-sonos pause --name "Kitchen"
-sonos pause --ip 10.0.0.42
+sonosh pause --name "Kitchen"
+sonosh pause --ip 10.0.0.42
 ```
 
 ## Notes

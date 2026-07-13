@@ -1,22 +1,22 @@
 ---
-title: sonos next
+title: sonosh next
 description: Skip to the next track in the queue.
 ---
 
-# `sonos next`
+# `sonosh next`
 
 Sends `AVTransport.Next` to the group coordinator.
 
 ## Synopsis
 
 ```
-sonos next --name "<Room>"
+sonosh next --name "<Room>"
 ```
 
 ## Examples
 
 ```bash
-sonos next --name "Kitchen"
+sonosh next --name "Kitchen"
 ```
 
 ## Notes

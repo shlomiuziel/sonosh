@@ -18,7 +18,7 @@ It keeps the most common controls close to the keyboard: switch rooms, browse th
 
 ## Sonos CLI and backend
 
-The `sonos` CLI is documented below.
+The `sonosh` CLI is documented below.
 
 ## Install / build
 
@@ -40,8 +40,8 @@ brew upgrade shlomiuziel/tap/sonosh
 
 First-time Spotify setup:
 
-- If you want Spotify / SMAPI search in `sonosh`, use the inherited `sonos` CLI: `sonos auth smapi begin --service "Spotify"` and finish the DeviceLink/AppLink flow.
-- Use `sonos config set defaultRoom "<Room Name>"` and `sonos config set defaultTimeout 20s` if you want sticky defaults for the TUI and CLI.
+- If you want Spotify / SMAPI search in `sonosh`, use the inherited `sonosh` CLI: `sonosh auth smapi begin --service "Spotify"` and finish the DeviceLink/AppLink flow.
+- Use `sonosh config set defaultRoom "<Room Name>"` and `sonosh config set defaultTimeout 20s` if you want sticky defaults for the TUI and CLI.
 - See [`docs/commands/sonos-auth-smapi.md`](docs/commands/sonos-auth-smapi.md) and [`docs/commands/sonos-config.md`](docs/commands/sonos-config.md) for the full command details.
 
 Install from source (Go):
@@ -65,11 +65,11 @@ swift build --package-path helpers/macos/sonosh-helper --configuration release
 ./sonosh --mac-helper-path helpers/macos/sonosh-helper/.build/release/sonosh-macos-helper
 ```
 
-Build `sonos` locally:
+Build `sonosh` locally:
 
 ```bash
-go build -o sonos ./cmd/sonos
-./sonos --version
+go build -o sonosh ./cmd/sonosh
+./sonosh --version
 ```
 
 Useful TUI keys:
@@ -88,55 +88,55 @@ Useful TUI keys:
 Docker:
 
 ```bash
-docker build -t sonoscli .
-docker run --rm --network host -v "$PWD/.sonoscli:/data" sonoscli discover
+docker build -t sonosh .
+docker run --rm --network host -v "$PWD/.sonoscli:/data" sonosh discover
 ```
 
 Linux containers need `--network host` for SSDP/UPnP discovery. The image includes `ffmpeg`, `yt-dlp`, and `curl`.
 
 ## First run
 
-Note: if you installed via Homebrew or `go install`, replace `./sonos` with `sonos`.
+Note: if you installed via Homebrew or `go install`, replace `./sonosh` with `sonosh`.
 
 Discover speakers:
 
 ```bash
-./sonos discover
-./sonos discover --format json
-./sonos discover --all # include invisible/bonded devices (advanced)
+./sonosh discover
+./sonosh discover --format json
+./sonosh discover --all # include invisible/bonded devices (advanced)
 ```
 
 Show room status:
 
 ```bash
-./sonos status --name "Kitchen"
-./sonos now --name "Kitchen"
-./sonos status --name "Kitchen" --format json
+./sonosh status --name "Kitchen"
+./sonosh now --name "Kitchen"
+./sonosh status --name "Kitchen" --format json
 ```
 
 Playback controls:
 
 ```bash
-./sonos play --name "Kitchen"
-./sonos pause --name "Kitchen"
-./sonos stop --name "Kitchen"
-./sonos next --name "Kitchen"
-./sonos prev --name "Kitchen"
+./sonosh play --name "Kitchen"
+./sonosh pause --name "Kitchen"
+./sonosh stop --name "Kitchen"
+./sonosh next --name "Kitchen"
+./sonosh prev --name "Kitchen"
 ```
 
 Watch live events:
 
 ```bash
-./sonos watch --name "Kitchen"
-./sonos watch --name "Kitchen" --format json
-./sonos watch --name "Kitchen" --format tsv
+./sonosh watch --name "Kitchen"
+./sonosh watch --name "Kitchen" --format json
+./sonosh watch --name "Kitchen" --format tsv
 ```
 
 Note: this starts a local callback server for UPnP events; your OS firewall may prompt to allow incoming connections.
 
 ## CLI overview
 
-Run `sonos --help` for the full list. Most commonly used:
+Run `sonosh --help` for the full list. Most commonly used:
 
 - Discovery & status: `discover`, `status`/`now`, `watch`
 - Playback controls: `play`, `pause`, `stop`, `next`, `prev`, `open`, `enqueue`, `play-url`, `play-uri`, `linein`, `tv`
@@ -151,21 +151,21 @@ Run `sonos --help` for the full list. Most commonly used:
 List the queue:
 
 ```bash
-./sonos queue list --name "Kitchen"
-./sonos queue list --name "Kitchen" --format json
+./sonosh queue list --name "Kitchen"
+./sonosh queue list --name "Kitchen" --format json
 ```
 
 Play or remove a queue entry (positions are 1-based):
 
 ```bash
-./sonos queue play --name "Kitchen" 1
-./sonos queue remove --name "Kitchen" 3
+./sonosh queue play --name "Kitchen" 1
+./sonosh queue remove --name "Kitchen" 3
 ```
 
 Clear the queue:
 
 ```bash
-./sonos queue clear --name "Kitchen"
+./sonosh queue clear --name "Kitchen"
 ```
 
 ## Scenes
@@ -173,20 +173,20 @@ Clear the queue:
 Save the current room layout and volumes as a scene:
 
 ```bash
-./sonos scene save "Evening"
+./sonosh scene save "Evening"
 ```
 
 Restore a saved scene:
 
 ```bash
-./sonos scene apply "Evening"
+./sonosh scene apply "Evening"
 ```
 
 Manage saved scenes:
 
 ```bash
-./sonos scene list
-./sonos scene delete "Evening"
+./sonosh scene list
+./sonosh scene delete "Evening"
 ```
 
 Scenes are stored in your user config dir as `sonoscli/scenes.json` (e.g. `~/.config/sonoscli/scenes.json` on macOS/Linux).
@@ -196,20 +196,20 @@ Scenes are stored in your user config dir as `sonoscli/scenes.json` (e.g. `~/.co
 List Sonos Favorites:
 
 ```bash
-./sonos favorites list --name "Kitchen"
-./sonos favorites list --name "Kitchen" --format json
+./sonosh favorites list --name "Kitchen"
+./sonosh favorites list --name "Kitchen" --format json
 ```
 
 Play a favorite by index:
 
 ```bash
-./sonos favorites open --name "Kitchen" --index 1
+./sonosh favorites open --name "Kitchen" --index 1
 ```
 
 Or play by title:
 
 ```bash
-./sonos favorites open --name "Kitchen" "BBC Radio 6 Music"
+./sonosh favorites open --name "Kitchen" "BBC Radio 6 Music"
 ```
 
 ## Media URLs
@@ -217,34 +217,34 @@ Or play by title:
 Play a direct media URL:
 
 ```bash
-./sonos play-uri --name "Kitchen" "https://example.com/stream.mp3"
+./sonosh play-uri --name "Kitchen" "https://example.com/stream.mp3"
 ```
 
 Play a URL through the Sonos-safe local proxy (requires `ffmpeg`; `yt-dlp` for YouTube and media pages):
 
 ```bash
-./sonos play-url --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
-./sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
-./sonos play-url --name "Kitchen" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
-./sonos play-url --name "Kitchen" "https://example.com/podcast/episode.mp3"
+./sonosh play-url --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+./sonosh play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
+./sonosh play-url --name "Kitchen" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
+./sonosh play-url --name "Kitchen" "https://example.com/podcast/episode.mp3"
 ```
 
 Play as radio (useful for live streams):
 
 ```bash
-./sonos play-uri --name "Kitchen" --radio --title "My Stream" "https://example.com/live.mp3"
+./sonosh play-uri --name "Kitchen" --radio --title "My Stream" "https://example.com/live.mp3"
 ```
 
 Select line-in input:
 
 ```bash
-./sonos linein --name "Kitchen" --from "Living Room"
+./sonosh linein --name "Kitchen" --from "Living Room"
 ```
 
 Select TV input (soundbar):
 
 ```bash
-./sonos tv --name "Living Room"
+./sonosh tv --name "Living Room"
 ```
 
 ## Room grouping
@@ -252,78 +252,78 @@ Select TV input (soundbar):
 View current groups:
 
 ```bash
-./sonos group status
-./sonos group status --all # include invisible/bonded devices (advanced)
+./sonosh group status
+./sonosh group status --all # include invisible/bonded devices (advanced)
 ```
 
 Move `Bedroom` into `Living Room`’s group:
 
 ```bash
-./sonos group join --name "Bedroom" --to "Living Room"
+./sonosh group join --name "Bedroom" --to "Living Room"
 ```
 
 Room targeting supports fuzzy substring matching (and will suggest matches on ambiguity):
 
 ```bash
-./sonos group join --name "Off" --to "Bar"     # "Office" joins "Bar"
-./sonos group join --name "Bed" --to "Liv"     # "Bedroom" joins "Living Room"
+./sonosh group join --name "Off" --to "Bar"     # "Office" joins "Bar"
+./sonosh group join --name "Bed" --to "Liv"     # "Bedroom" joins "Living Room"
 ```
 
 Split a speaker out of its group:
 
 ```bash
-./sonos group unjoin --name "Bedroom"
+./sonosh group unjoin --name "Bedroom"
 ```
 
 Solo a speaker (ungroup its current group so it plays alone):
 
 ```bash
-./sonos group solo --name "Office"
+./sonosh group solo --name "Office"
 ```
 
 Party mode (join all visible speakers to a target group):
 
 ```bash
-./sonos group party --to "Bar"
+./sonosh group party --to "Bar"
 ```
 
 Remove grouping from the whole group:
 
 ```bash
-./sonos group dissolve --name "Living Room"
+./sonosh group dissolve --name "Living Room"
 ```
 
 Keep `Office` playing on its own:
 
 ```bash
-./sonos group solo --name "Office"
-./sonos open --name "Office" "https://open.spotify.com/album/<id>"
+./sonosh group solo --name "Office"
+./sonosh open --name "Office" "https://open.spotify.com/album/<id>"
 ```
 
 Add a speaker back to a group:
 
 ```bash
-./sonos group join --name "Office" --to "Bar"
+./sonosh group join --name "Office" --to "Bar"
 ```
 
 Control group volume and mute:
 
 ```bash
-./sonos group volume get --name "Living Room"
-./sonos group volume set --name "Living Room" 25
+./sonosh group volume get --name "Living Room"
+./sonosh group volume set --name "Living Room" 25
 
-./sonos group mute get --name "Living Room"
-./sonos group mute toggle --name "Living Room"
+./sonosh group mute get --name "Living Room"
+./sonosh group mute toggle --name "Living Room"
 ```
 
 Control room volume and mute:
 
 ```bash
-./sonos volume get --name "Kitchen"
-./sonos volume set --name "Kitchen" 25
+./sonosh volume get --name "Kitchen"
+./sonosh volume set --name "Kitchen" 25
 
-./sonos mute get --name "Kitchen"
-./sonos mute toggle --name "Kitchen"
+./sonosh mute get --name "Kitchen"
+./sonosh mute toggle --name "Kitchen"
 ```
 
 ## Room targeting
@@ -332,31 +332,31 @@ Target a speaker by:
 - `--name "Kitchen"` (Sonos room name)
 - `--ip 192.168.0.250` (speaker IP)
 
-Most commands must be sent to the *group coordinator* (the device that owns transport state for the group). `sonoscli` resolves the coordinator automatically so commands behave like the Sonos app.
+Most commands must be sent to the *group coordinator* (the device that owns transport state for the group). `sonosh` resolves the coordinator automatically so commands behave like the Sonos app.
 
 ## Spotify search
 
 Search via Sonos (SMAPI; no Spotify Web API credentials):
 
 ```bash
-./sonos smapi services
-./sonos smapi categories --service "Spotify"
-./sonos smapi browse --service "Spotify" --id root
-./sonos auth smapi begin --service "Spotify"
+./sonosh smapi services
+./sonosh smapi categories --service "Spotify"
+./sonosh smapi browse --service "Spotify" --id root
+./sonosh auth smapi begin --service "Spotify"
 # open the printed URL in a browser, link your account, then:
-./sonos auth smapi complete --service "Spotify" --code <linkCode> --wait 5m
+./sonosh auth smapi complete --service "Spotify" --code <linkCode> --wait 5m
 
-./sonos smapi search --service "Spotify" --category tracks "gareth emery"
-./sonos smapi search --service "Spotify" --category tracks --open --name "Office" "gareth emery"
+./sonosh smapi search --service "Spotify" --category tracks "gareth emery"
+./sonosh smapi search --service "Spotify" --category tracks --open --name "Office" "gareth emery"
 ```
 
-Some AppLink services only return a native app authentication URL and no device-link code. In that case, `auth smapi begin` prints the app URL and notes that `sonoscli` cannot complete token storage automatically.
+Some AppLink services only return a native app authentication URL and no device-link code. In that case, `auth smapi begin` prints the app URL and notes that `sonosh` cannot complete token storage automatically.
 
 Play from a search query (shortcut for SMAPI search + open):
 
 ```bash
-./sonos play spotify --name "Office" "gareth emery"
-./sonos play spotify --name "Office" --category albums "gareth emery"
+./sonosh play spotify --name "Office" "gareth emery"
+./sonosh play spotify --name "Office" --category albums "gareth emery"
 ```
 
 SMAPI tokens are stored under your user config dir as `sonoscli/smapi_tokens.json` (e.g. `~/.config/sonoscli/smapi_tokens.json` on macOS/Linux).
@@ -367,27 +367,27 @@ Search via Spotify Web API (prints playable URIs):
 export SPOTIFY_CLIENT_ID="..."
 export SPOTIFY_CLIENT_SECRET="..."
 
-./sonos search spotify --type track --limit 5 "daft punk harder better"
-./sonos search spotify --type playlist "focus"
+./sonosh search spotify --type track --limit 5 "daft punk harder better"
+./sonosh search spotify --type playlist "focus"
 ```
 
 Open the first result on Sonos:
 
 ```bash
-./sonos search spotify --open --name "Kitchen" "miles davis so what"
+./sonosh search spotify --open --name "Kitchen" "miles davis so what"
 ```
 
 Enqueue and play:
 
 ```bash
-./sonos open --name "Kitchen" spotify:track:6NmXV4o6bmp704aPGyTVVG
-./sonos open --name "Kitchen" https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG
+./sonosh open --name "Kitchen" spotify:track:6NmXV4o6bmp704aPGyTVVG
+./sonosh open --name "Kitchen" https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG
 ```
 
 Enqueue only:
 
 ```bash
-./sonos enqueue --name "Kitchen" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
+./sonosh enqueue --name "Kitchen" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
 ```
 
 Notes:
@@ -423,12 +423,12 @@ pnpm test
 pnpm format
 pnpm lint
 
-pnpm sonos -- discover
-pnpm sonos -- status --name "Kitchen"
-pnpm sonos -- open --name "Kitchen" spotify:track:6NmXV4o6bmp704aPGyTVVG
-pnpm sonos -- search spotify "miles davis so what"
-pnpm sonos -- group status
-pnpm sonos -- queue list --name "Kitchen"
+pnpm sonosh -- discover
+pnpm sonosh -- status --name "Kitchen"
+pnpm sonosh -- open --name "Kitchen" spotify:track:6NmXV4o6bmp704aPGyTVVG
+pnpm sonosh -- search spotify "miles davis so what"
+pnpm sonosh -- group status
+pnpm sonosh -- queue list --name "Kitchen"
 ```
 
 CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
@@ -436,9 +436,9 @@ CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
 ## Global flags
 
 - `--ip <ip>`: target by IP
-- `--name <name>`: target by speaker name (defaults to `sonos config defaultRoom` if set)
-- `--timeout <duration>`: discovery/network timeout (default `15s`, configurable with `sonos config set defaultTimeout 10s`)
-- `--format plain|json|tsv`: output format (defaults to `sonos config format` if set)
+- `--name <name>`: target by speaker name (defaults to `sonosh config defaultRoom` if set)
+- `--timeout <duration>`: discovery/network timeout (default `15s`, configurable with `sonosh config set defaultTimeout 10s`)
+- `--format plain|json|tsv`: output format (defaults to `sonosh config format` if set)
 - `--json`: deprecated alias for `--format json`
 - `--debug`: enable detailed trace logs (SSDP/topology/SOAP timings)
 
@@ -447,11 +447,11 @@ CI runs: `gofmt` check, `go vet`, `go test`, and `golangci-lint`.
 Persist small local defaults so repeated commands stay terse:
 
 ```bash
-./sonos config get
-./sonos config set defaultRoom "Office"
-./sonos config set defaultTimeout 10s
-./sonos config set format json
-./sonos config unset defaultRoom
+./sonosh config get
+./sonosh config set defaultRoom "Office"
+./sonosh config set defaultTimeout 10s
+./sonosh config set format json
+./sonosh config unset defaultRoom
 ```
 
 Supported keys:
@@ -465,13 +465,13 @@ Snake-case aliases (`default_room`, `default_timeout`) are accepted too.
 ## Troubleshooting
 
 - `discover` is empty:
-  - Some networks block multicast/SSDP; `sonoscli` falls back to scanning local /24 subnets for port `1400` and then uses Sonos topology to list all rooms.
+  - Some networks block multicast/SSDP; `sonosh` falls back to scanning local /24 subnets for port `1400` and then uses Sonos topology to list all rooms.
   - Ensure Wi‑Fi client isolation is off and you’re on the same LAN/subnet.
 - Discovery is slow or flaky:
-  - The default timeout is `15s`. Use `sonos config set defaultTimeout 20s` to make a longer timeout sticky, or pass `--timeout 5s` in scripts that should fail fast.
-  - Run `sonos --debug discover` to see whether SSDP multicast is timing out and whether topology calls are slow.
+  - The default timeout is `15s`. Use `sonosh config set defaultTimeout 20s` to make a longer timeout sticky, or pass `--timeout 5s` in scripts that should fail fast.
+  - Run `sonosh --debug discover` to see whether SSDP multicast is timing out and whether topology calls are slow.
 - Discovery / SOAP calls hang or time out on your network:
-  - `sonoscli` retries local Sonos HTTP/SOAP calls via `curl` as a workaround for some network/firmware quirks.
+  - `sonosh` retries local Sonos HTTP/SOAP calls via `curl` as a workaround for some network/firmware quirks.
 - Commands fail with UPnP/SOAP errors:
   - Verify you can reach `http://<speaker-ip>:1400/` from this machine.
   - Try targeting by `--name` (it resolves the coordinator).

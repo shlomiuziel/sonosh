@@ -1,9 +1,9 @@
 ---
-title: sonos play-url
+title: sonosh play-url
 description: Play YouTube, podcast, radio, and other URLs through a short-lived Sonos-safe proxy.
 ---
 
-# `sonos play-url`
+# `sonosh play-url`
 
 Starts a local daemon that turns a URL into a Sonos-safe MP3 stream, points the target room at it, and lets the daemon exit when playback ends or goes idle.
 
@@ -12,7 +12,7 @@ Use this for most web audio. It is more reliable than handing Sonos a temporary 
 ## Synopsis
 
 ```
-sonos play-url <url> --name "<Room>" [flags]
+sonosh play-url <url> --name "<Room>" [flags]
 ```
 
 ## What It Accepts
@@ -61,18 +61,18 @@ Use `--playlist` to force playlist mode on an ambiguous watch+playlist URL (`?v=
 ## Examples
 
 ```bash
-sonos play-url --name "Office" "https://www.youtube.com/watch?v=-n_rdQIVahw"
-sonos play-url --name "Office" "https://music.youtube.com/playlist?list=PL..."
-sonos play-url --name "Office" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
-sonos play-url --name "Office" --playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
-sonos play-url --name "Office" --no-playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
-sonos play-url --name "Office" "https://example.com/podcast/episode.mp3"
-sonos play-url --name "Office" --resolver yt-dlp "https://soundcloud.com/example/track"
+sonosh play-url --name "Office" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+sonosh play-url --name "Office" "https://music.youtube.com/playlist?list=PL..."
+sonosh play-url --name "Office" --playlist-limit 10 "https://music.youtube.com/playlist?list=PL..."
+sonosh play-url --name "Office" --playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
+sonosh play-url --name "Office" --no-playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
+sonosh play-url --name "Office" "https://example.com/podcast/episode.mp3"
+sonosh play-url --name "Office" --resolver yt-dlp "https://soundcloud.com/example/track"
 ```
 
 ## Metadata
 
-For single-stream playback, `sonoscli` sends the resolved title/provider as Sonos DIDL metadata, so status and the Sonos app can show the actual media title instead of a generic proxy name. If the speaker requests ICY metadata, the daemon also interleaves the resolved media title and provider while the MP3 stream is served. Finite playlist tracks are served as plain MP3 queue items with DIDL metadata so Sonos can advance cleanly from track to track.
+For single-stream playback, `sonosh` sends the resolved title/provider as Sonos DIDL metadata, so status and the Sonos app can show the actual media title instead of a generic proxy name. If the speaker requests ICY metadata, the daemon also interleaves the resolved media title and provider while the MP3 stream is served. Finite playlist tracks are served as plain MP3 queue items with DIDL metadata so Sonos can advance cleanly from track to track.
 
 ## Lifecycle
 

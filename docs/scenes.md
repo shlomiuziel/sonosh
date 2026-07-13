@@ -10,7 +10,7 @@ A **scene** is a named snapshot of your Sonos system: which speakers are grouped
 ## Save what you have right now
 
 ```bash
-sonos scene save evening
+sonosh scene save evening
 ```
 
 This walks the live topology, snapshots every visible zone (and its members, volume, and mute), and stores the scene under your config directory.
@@ -18,17 +18,17 @@ This walks the live topology, snapshots every visible zone (and its members, vol
 ## List, apply, delete
 
 ```bash
-sonos scene list
-sonos scene apply evening
-sonos scene delete evening
+sonosh scene list
+sonosh scene apply evening
+sonosh scene delete evening
 ```
 
-Apply is best-effort and idempotent — running `sonos scene apply evening` twice is safe.
+Apply is best-effort and idempotent — running `sonosh scene apply evening` twice is safe.
 
 ## Targeting one room (experimental)
 
 ```bash
-sonos scene apply evening --only "Kitchen"
+sonosh scene apply evening --only "Kitchen"
 ```
 
 Only restores the parts of the scene that involve the named room. Useful when you don't want to disturb other zones.
@@ -50,8 +50,8 @@ Captured:
 If you want a scene that also re-loads a queue, save the queue separately (e.g. capture a Spotify URI) and chain commands in a shell script:
 
 ```bash
-sonos scene apply evening
-sonos open --name "Living Room" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
+sonosh scene apply evening
+sonosh open --name "Living Room" spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
 ```
 
 ## How apply works

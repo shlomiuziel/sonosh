@@ -1,16 +1,16 @@
 ---
-title: sonos linein
+title: sonosh linein
 description: Play line-in audio from one speaker on another speaker or group.
 ---
 
-# `sonos linein`
+# `sonosh linein`
 
 Plays line-in from a source speaker on the target speaker or group. If `--from` is omitted, the target itself is used as the source.
 
 ## Synopsis
 
 ```
-sonos linein --name "<Target>" [--from "<Source>"]
+sonosh linein --name "<Target>" [--from "<Source>"]
 ```
 
 ## Flags
@@ -23,10 +23,10 @@ sonos linein --name "<Target>" [--from "<Source>"]
 
 ```bash
 # Play the Connect:Amp's line-in throughout the Kitchen group
-sonos linein --name "Kitchen" --from "Connect Amp"
+sonosh linein --name "Kitchen" --from "Connect Amp"
 
 # Same speaker is source and target
-sonos linein --name "Office"
+sonosh linein --name "Office"
 ```
 
 ## How it works

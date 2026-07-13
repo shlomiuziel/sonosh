@@ -1,18 +1,18 @@
 ---
-title: sonos play youtube
+title: sonosh play youtube
 description: Resolve a YouTube URL with yt-dlp and play the direct audio stream on Sonos.
 ---
 
-# `sonos play youtube`
+# `sonosh play youtube`
 
 Uses `yt-dlp` to resolve a YouTube URL to a temporary direct audio URL, sets that URL on the group coordinator, and starts playback.
 
-For day-to-day playback, prefer [`sonos play-url`](sonos-play-url.md). It runs a short-lived local proxy, lets `yt-dlp` handle HLS-only YouTube media, transcodes to a Sonos-safe MP3 stream, supports YouTube / YouTube Music playlist URLs, and provides cleaner metadata in the Sonos app.
+For day-to-day playback, prefer [`sonosh play-url`](sonos-play-url.md). It runs a short-lived local proxy, lets `yt-dlp` handle HLS-only YouTube media, transcodes to a Sonos-safe MP3 stream, supports YouTube / YouTube Music playlist URLs, and provides cleaner metadata in the Sonos app.
 
 ## Synopsis
 
 ```
-sonos play youtube <url> --name "<Room>" [--yt-dlp <path>] [--media-format <selector>] [--title "<title>"] [--radio]
+sonosh play youtube <url> --name "<Room>" [--yt-dlp <path>] [--media-format <selector>] [--title "<title>"] [--radio]
 ```
 
 ## Requirements
@@ -20,7 +20,7 @@ sonos play youtube <url> --name "<Room>" [--yt-dlp <path>] [--media-format <sele
 - `yt-dlp` must be installed and available on `PATH`, or passed with `--yt-dlp`.
 - The Sonos speaker must be able to fetch the resolved `googlevideo.com` URL directly.
 - Resolved YouTube URLs expire; rerun the command if playback starts failing later.
-- Some videos only expose HLS audio that Sonos or direct `ffmpeg` fetching may reject. Use `sonos play-url` for those.
+- Some videos only expose HLS audio that Sonos or direct `ffmpeg` fetching may reject. Use `sonosh play-url` for those.
 
 ## Flags
 
@@ -34,26 +34,26 @@ sonos play youtube <url> --name "<Room>" [--yt-dlp <path>] [--media-format <sele
 ## Examples
 
 ```bash
-sonos play youtube --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
+sonosh play youtube --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw"
 ```
 
-For a URL that includes a playlist or YouTube radio queue, `sonoscli` plays only the selected/current video:
+For a URL that includes a playlist or YouTube radio queue, `sonosh` plays only the selected/current video:
 
 ```bash
-sonos play youtube --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw&list=RD-n_rdQIVahw&start_radio=1"
+sonosh play youtube --name "Kitchen" "https://www.youtube.com/watch?v=-n_rdQIVahw&list=RD-n_rdQIVahw&start_radio=1"
 ```
 
 To enqueue a YouTube / YouTube Music playlist, use `play-url` instead:
 
 ```bash
-sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
-sonos play-url --name "Kitchen" --playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
+sonosh play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
+sonosh play-url --name "Kitchen" --playlist "https://www.youtube.com/watch?v=-n_rdQIVahw&list=PL..."
 ```
 
 If Sonos rejects normal track-style playback, retry as a radio stream:
 
 ```bash
-sonos play youtube --name "Kitchen" --radio "https://www.youtube.com/watch?v=-n_rdQIVahw"
+sonosh play youtube --name "Kitchen" --radio "https://www.youtube.com/watch?v=-n_rdQIVahw"
 ```
 
 ## How it works

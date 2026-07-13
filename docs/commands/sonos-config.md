@@ -1,23 +1,23 @@
 ---
-title: sonos config
+title: sonosh config
 description: Read and write small local defaults stored under your user config directory.
 ---
 
-# `sonos config`
+# `sonosh config`
 
-`sonoscli` keeps a small JSON file with local defaults: a default room name, preferred output format, and default discovery/network timeout.
+`sonosh` keeps a small JSON file with local defaults: a default room name, preferred output format, and default discovery/network timeout.
 
 ```
-sonos config get  [key]
-sonos config set  <key> <value>
-sonos config unset <key>
-sonos config path
+sonosh config get  [key]
+sonosh config set  <key> <value>
+sonosh config unset <key>
+sonosh config path
 ```
 
 ## Where it lives
 
 ```bash
-sonos config path
+sonosh config path
 # → ~/.config/sonoscli/config.json   (Linux)
 # → ~/Library/Application Support/sonoscli/config.json   (macOS)
 # → %AppData%\sonoscli\config.json   (Windows)
@@ -26,18 +26,18 @@ sonos config path
 ## Reading
 
 ```bash
-sonos config get                      # everything
-sonos config get defaultRoom          # one key
-sonos config get --format json
+sonosh config get                      # everything
+sonosh config get defaultRoom          # one key
+sonosh config get --format json
 ```
 
 ## Writing
 
 ```bash
-sonos config set defaultRoom "Kitchen"
-sonos config set defaultTimeout 10s
-sonos config set format json
-sonos config unset defaultRoom
+sonosh config set defaultRoom "Kitchen"
+sonosh config set defaultTimeout 10s
+sonosh config set format json
+sonosh config unset defaultRoom
 ```
 
 ## Keys
@@ -50,5 +50,5 @@ Snake-case aliases are accepted for compatibility: `default_room`, `default_time
 
 ## Notes
 
-- The file is intentionally small — please go through `sonos config` to write it; the schema is allowed to evolve.
+- The file is intentionally small — please go through `sonosh config` to write it; the schema is allowed to evolve.
 - Sensitive items (e.g. SMAPI tokens) are stored separately from this file.

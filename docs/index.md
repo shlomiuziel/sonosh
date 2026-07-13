@@ -1,12 +1,12 @@
 ---
-title: sonoscli
+title: sonosh
 description: A modern Go CLI to discover, group, and control Sonos speakers over your local network — built for terminals, scripts, automations, and coding agents.
 permalink: /
 ---
 
-# sonoscli
+# sonosh
 
-`sonos` is a single binary that talks to your Sonos system the way the Sonos app does — over the local network, using UPnP/SOAP — but from the terminal.
+`sonosh` is a single binary that talks to your Sonos system the way the Sonos app does — over the local network, using UPnP/SOAP — but from the terminal.
 
 ## What you can do
 
@@ -23,24 +23,24 @@ permalink: /
 
 ## Why a CLI?
 
-Sonos's IP API is rich, stable, and undocumented in places. The official apps are great for everyday use but painful for automations, kiosks, and AI agents. `sonoscli` treats your speakers as plain HTTP devices on port `1400` and exposes the most useful actions as composable subcommands.
+Sonos's IP API is rich, stable, and undocumented in places. The official apps are great for everyday use but painful for automations, kiosks, and AI agents. `sonosh` treats your speakers as plain HTTP devices on port `1400` and exposes the most useful actions as composable subcommands.
 
 This is not an official Sonos project.
 
 ## At a glance
 
 ```bash
-brew install steipete/tap/sonoscli
+brew install shlomiuziel/tap/sonosh
 
-sonos discover
-sonos config set defaultRoom "Kitchen"
-sonos config set defaultTimeout 15s
-sonos status --name "Kitchen"
-sonos open --name "Kitchen" "https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG"
-sonos play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
-sonos group party --to "Living Room"
-sonos scene save evening
-sonos watch --name "Kitchen"
+sonosh discover
+sonosh config set defaultRoom "Kitchen"
+sonosh config set defaultTimeout 15s
+sonosh status --name "Kitchen"
+sonosh open --name "Kitchen" "https://open.spotify.com/track/6NmXV4o6bmp704aPGyTVVG"
+sonosh play-url --name "Kitchen" "https://music.youtube.com/playlist?list=PL..."
+sonosh group party --to "Living Room"
+sonosh scene save evening
+sonosh watch --name "Kitchen"
 ```
 
 Pick a starting point:

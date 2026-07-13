@@ -8,4 +8,4 @@ if [[ "${1:-}" == "--" ]]; then
   shift
 fi
 
-exec ./bin/sonos "$@"
+exec ./bin/sonosh "$@"

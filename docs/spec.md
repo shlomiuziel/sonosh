@@ -1,6 +1,6 @@
-# sonoscli – Design & Specification
+# sonosh – Design & Specification
 
-This document describes the overall architecture, command surface, and key implementation details of `sonoscli`.
+This document describes the overall architecture, command surface, and key implementation details of `sonosh`.
 
 ## Goals
 
@@ -19,7 +19,7 @@ Non-goals (for now):
 ## High-level Architecture
 
 ```
-cmd/sonos/                 # main entrypoint
+cmd/sonosh/                 # main entrypoint
 internal/cli/              # Cobra commands and output formatting
 internal/sonos/            # Sonos UPnP/SOAP, SSDP discovery, topology parsing
 internal/spotify/          # Spotify Web API (client credentials) search helper
@@ -69,65 +69,65 @@ Key services/actions:
 
 ### Discovery
 
-- `sonos discover` – list speakers (room name, IP, UDN)
+- `sonosh discover` – list speakers (room name, IP, UDN)
   - `--format json` supported.
 
 ### Status
 
-- `sonos status --name "<Room>"` (or `sonos now`) – show playback status, current URI, time, volume/mute, and parsed now-playing metadata when available (`Title/Artist/Album/AlbumArt`).
+- `sonosh status --name "<Room>"` (or `sonosh now`) – show playback status, current URI, time, volume/mute, and parsed now-playing metadata when available (`Title/Artist/Album/AlbumArt`).
   - `--format json` supported.
 
 ### Transport
 
-- `sonos play|pause|stop|next|prev --name "<Room>"`
+- `sonosh play|pause|stop|next|prev --name "<Room>"`
 
 ### Watch (events)
 
-- `sonos watch --name "<Room>" [--duration 30s]`
+- `sonosh watch --name "<Room>" [--duration 30s]`
   - Subscribes to `AVTransport` and `RenderingControl` UPnP events and prints changes as they arrive.
   - `--format json` prints one JSON object per line (stream-friendly).
 
 ### Volume / mute
 
-- `sonos volume get|set --name "<Room>" <0-100>`
-- `sonos mute get|on|off|toggle --name "<Room>"`
+- `sonosh volume get|set --name "<Room>" <0-100>`
+- `sonosh mute get|on|off|toggle --name "<Room>"`
 
 ### Queue
 
-- `sonos queue list --name "<Room>" [--start N] [--limit N]` (and `--format json|tsv`)
-- `sonos queue play --name "<Room>" <pos>` (1-based)
-- `sonos queue remove --name "<Room>" <pos>` (1-based)
-- `sonos queue clear --name "<Room>"`
+- `sonosh queue list --name "<Room>" [--start N] [--limit N]` (and `--format json|tsv`)
+- `sonosh queue play --name "<Room>" <pos>` (1-based)
+- `sonosh queue remove --name "<Room>" <pos>` (1-based)
+- `sonosh queue clear --name "<Room>"`
 
 ### Favorites
 
-- `sonos favorites list --name "<Room>" [--start N] [--limit N]` (and `--format json|tsv`)
-- `sonos favorites open --name "<Room>" --index <N>`
-- `sonos favorites open --name "<Room>" "<title>"`
+- `sonosh favorites list --name "<Room>" [--start N] [--limit N]` (and `--format json|tsv`)
+- `sonosh favorites open --name "<Room>" --index <N>`
+- `sonosh favorites open --name "<Room>" "<title>"`
 
 ### Other sources
 
-- `sonos play-url --name "<Room>" "<url>" [--playlist] [--no-playlist] [--playlist-limit N]`
+- `sonosh play-url --name "<Room>" "<url>" [--playlist] [--no-playlist] [--playlist-limit N]`
   - Starts a local daemon that resolves media pages with `yt-dlp` when useful, pipes `yt-dlp` sources into `ffmpeg`, transcodes to MP3, and points Sonos at the local stream.
   - Unambiguous YouTube / YouTube Music playlist URLs (`?list=…` with no `?v=…`) are enumerated and enqueued track-by-track through one local proxy.
-- `sonos play-uri --name "<Room>" "<uri>" [--title "..."] [--radio]`
-- `sonos linein --name "<Room>" [--from "<RoomWithLineIn>"]`
-- `sonos tv --name "<Room>"`
+- `sonosh play-uri --name "<Room>" "<uri>" [--title "..."] [--radio]`
+- `sonosh linein --name "<Room>" [--from "<RoomWithLineIn>"]`
+- `sonosh tv --name "<Room>"`
 
 ### Scenes
 
-- `sonos scene save <name>` – capture grouping + per-room volume/mute
-- `sonos scene apply <name>` – restore grouping + per-room volume/mute
-- `sonos scene list` – list saved scenes (`--format json|tsv` supported)
-- `sonos scene delete <name>` – delete a scene
+- `sonosh scene save <name>` – capture grouping + per-room volume/mute
+- `sonosh scene apply <name>` – restore grouping + per-room volume/mute
+- `sonosh scene list` – list saved scenes (`--format json|tsv` supported)
+- `sonosh scene delete <name>` – delete a scene
 
 ### Spotify (no Spotify credentials required)
 
 Spotify must already be linked in the Sonos app.
 
-- `sonos open --name "<Room>" <spotify-uri-or-share-link>`
+- `sonosh open --name "<Room>" <spotify-uri-or-share-link>`
   - Adds to queue and starts playback.
-- `sonos enqueue --name "<Room>" <spotify-uri-or-share-link>`
+- `sonosh enqueue --name "<Room>" <spotify-uri-or-share-link>`
   - Adds to queue without playing.
 
 Accepted Spotify refs:
@@ -138,40 +138,40 @@ Implementation detail: we generate Sonos-compatible DIDL metadata similar to SoC
 
 ### Spotify search (requires Spotify Web API credentials)
 
-- `sonos search spotify "<query>" [--type track|album|playlist|show|episode]`
+- `sonosh search spotify "<query>" [--type track|album|playlist|show|episode]`
   - Requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` (or `--client-id/--client-secret`).
-  - Prints `spotify:<type>:<id>` URIs usable with `sonos open` / `sonos enqueue`.
+  - Prints `spotify:<type>:<id>` URIs usable with `sonosh open` / `sonosh enqueue`.
   - `--open` / `--enqueue` optionally play/enqueue the selected result (`--index`).
 
 ### Sonos-side music-service search (SMAPI; no Spotify Web API credentials)
 
 Spotify must be linked in the Sonos app. Some services also require a one-time DeviceLink/AppLink flow.
 
-- `sonos smapi services` – list available services and auth types.
-- `sonos smapi categories --service "Spotify"` – list available search categories for a service.
-- `sonos auth smapi begin|complete --service "Spotify"` – link your account for SMAPI access.
-- `sonos smapi search --service "Spotify" --category tracks "<query>"` – prints canonical Spotify URIs usable with `sonos open` / `sonos enqueue`.
-- `sonos smapi browse --service "Spotify" --id root` – browse containers via SMAPI `getMetadata` (drill down by passing returned ids).
+- `sonosh smapi services` – list available services and auth types.
+- `sonosh smapi categories --service "Spotify"` – list available search categories for a service.
+- `sonosh auth smapi begin|complete --service "Spotify"` – link your account for SMAPI access.
+- `sonosh smapi search --service "Spotify" --category tracks "<query>"` – prints canonical Spotify URIs usable with `sonosh open` / `sonosh enqueue`.
+- `sonosh smapi browse --service "Spotify" --id root` – browse containers via SMAPI `getMetadata` (drill down by passing returned ids).
 
 ### Grouping
 
-- `sonos group status` – show all groups, coordinators, and members
+- `sonosh group status` – show all groups, coordinators, and members
   - `--format json|tsv` supported.
-- `sonos group join --name "<Room>" --to "<OtherRoomOrIP>"`
+- `sonosh group join --name "<Room>" --to "<OtherRoomOrIP>"`
   - Sends `AVTransport.SetAVTransportURI` to the *joining* speaker with `x-rincon:<COORDINATOR_UUID>`.
   - Room selection supports fuzzy substring matching; ambiguous matches return suggestions.
-- `sonos group unjoin --name "<Room>"`
+- `sonosh group unjoin --name "<Room>"`
   - Sends `AVTransport.BecomeCoordinatorOfStandaloneGroup` to the target speaker.
-- `sonos group party --to "<RoomOrIP>"`
+- `sonosh group party --to "<RoomOrIP>"`
   - Joins all visible speakers to the target group.
-- `sonos group dissolve --name "<Room>"`
+- `sonosh group dissolve --name "<Room>"`
   - Ungroups every member of the target group (leaves members first, coordinator last).
-- `sonos group volume get|set --name "<Room>" <0-100>`
-- `sonos group mute get|on|off|toggle --name "<Room>"`
+- `sonosh group volume get|set --name "<Room>" <0-100>`
+- `sonosh group mute get|on|off|toggle --name "<Room>"`
 
 ## Coordinator Awareness
 
-For transport-like actions (`play/pause/stop/next/prev`, queue operations, Spotify enqueue/open), the effective target should be the **group coordinator**. `sonoscli` resolves the coordinator via topology and sends commands to that device.
+For transport-like actions (`play/pause/stop/next/prev`, queue operations, Spotify enqueue/open), the effective target should be the **group coordinator**. `sonosh` resolves the coordinator via topology and sends commands to that device.
 
 Grouping actions are different:
 - `group join`: sent to the *joining* speaker.

@@ -1,16 +1,16 @@
 ---
-title: sonos play-uri
+title: sonosh play-uri
 description: Set the current transport URI to anything Sonos can play, then start playback.
 ---
 
-# `sonos play-uri`
+# `sonosh play-uri`
 
 Sets the current transport URI on the group coordinator and starts playback. Use `--radio` to force Sonos's radio-style controls for `http(s)` streams.
 
 ## Synopsis
 
 ```
-sonos play-uri <uri> --name "<Room>" [--radio] [--title "<title>"]
+sonosh play-uri <uri> --name "<Room>" [--radio] [--title "<title>"]
 ```
 
 ## Flags
@@ -24,20 +24,20 @@ sonos play-uri <uri> --name "<Room>" [--radio] [--title "<title>"]
 
 ```bash
 # Internet radio
-sonos play-uri --name "Kitchen" --radio --title "BBC R4" "http://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm"
+sonosh play-uri --name "Kitchen" --radio --title "BBC R4" "http://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm"
 
 # A direct file URL Sonos can reach
-sonos play-uri --name "Kitchen" "http://10.0.0.10/audio/test.mp3"
+sonosh play-uri --name "Kitchen" "http://10.0.0.10/audio/test.mp3"
 
 # A Sonos-specific scheme you already have
-sonos play-uri --name "Kitchen" "x-rincon-stream:RINCON_XXXX"
+sonosh play-uri --name "Kitchen" "x-rincon-stream:RINCON_XXXX"
 ```
 
 ## When to use what
 
-- Have a `spotify:` URI or share link → use [`sonos open`](sonos-open.md).
-- Have a Sonos Favorite → use [`sonos favorites open`](sonos-favorites.md).
-- Have any other URI Sonos can play (radio, raw file URL, `x-rincon-…`) → `sonos play-uri`.
+- Have a `spotify:` URI or share link → use [`sonosh open`](sonos-open.md).
+- Have a Sonos Favorite → use [`sonosh favorites open`](sonos-favorites.md).
+- Have any other URI Sonos can play (radio, raw file URL, `x-rincon-…`) → `sonosh play-uri`.
 
 ## How it works
 

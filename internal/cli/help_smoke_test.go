@@ -64,7 +64,7 @@ func TestVersionFlagWorks(t *testing.T) {
 	if err := root.ExecuteContext(context.Background()); err != nil {
 		t.Fatalf("version failed: %v\noutput:\n%s", err, out.String())
 	}
-	if got := out.String(); !strings.Contains(got, "sonos "+Version) {
+	if got := out.String(); !strings.Contains(got, "sonosh "+Version) {
 		t.Fatalf("unexpected version output: %q", got)
 	}
 }

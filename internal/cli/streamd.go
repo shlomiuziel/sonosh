@@ -14,7 +14,7 @@ import (
 func newStreamDaemonCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "stream-daemon",
-		Short:  "Manage the sonoscli stream proxy daemon",
+		Short:  "Manage the sonosh stream proxy daemon",
 		Hidden: true,
 	}
 	cmd.AddCommand(newStreamDaemonServeCmd(flags))
