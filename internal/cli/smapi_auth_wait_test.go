@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,17 @@ func TestCompleteSMAPIAuth_NoWaitAttemptsOnce(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("expected 1 call, got %d", calls)
+	}
+}
+
+func TestSMAPIAuthCompleteCodeHelpUsesSonosh(t *testing.T) {
+	cmd := newSMAPIAuthCompleteCmd(&rootFlags{})
+	flag := cmd.Flags().Lookup("code")
+	if flag == nil {
+		t.Fatal("missing code flag")
+	}
+	if !strings.Contains(flag.Usage, "`sonosh auth smapi begin`") {
+		t.Fatalf("code flag usage = %q, want sonosh auth smapi begin", flag.Usage)
 	}
 }
 

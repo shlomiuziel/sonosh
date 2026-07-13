@@ -158,7 +158,7 @@ func newSMAPIAuthCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "auth",
 		Short:  "Authenticate a Sonos music service (DeviceLink/AppLink)",
-		Hidden: true, // use `sonos auth smapi ...`
+		Hidden: true, // use `sonosh auth smapi ...`
 	}
 	cmd.AddCommand(newSMAPIAuthBeginCmd(flags))
 	cmd.AddCommand(newSMAPIAuthCompleteCmd(flags))
@@ -246,7 +246,7 @@ func newSMAPIAuthBeginCmd(flags *rootFlags) *cobra.Command {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Service: %s\n", svc.Name)
 			if res.RegURL != "" && res.LinkCode != "" {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Open this URL and link your account:\n  %s\n", res.RegURL)
-				completeCmd := fmt.Sprintf("sonos auth smapi complete --service %q --code %s --wait 5m", svc.Name, res.LinkCode)
+				completeCmd := fmt.Sprintf("sonosh auth smapi complete --service %q --code %s --wait 5m", svc.Name, res.LinkCode)
 				if res.LinkDeviceID != "" {
 					completeCmd += fmt.Sprintf(" --link-device-id %s", res.LinkDeviceID)
 				}
@@ -319,7 +319,7 @@ func newSMAPIAuthCompleteCmd(flags *rootFlags) *cobra.Command {
 			})
 			if err != nil {
 				if isSMAPIInvalidLinkCode(err) {
-					return fmt.Errorf("link code is invalid or expired; re-run `sonos auth smapi begin` and use the new code: %w", err)
+					return fmt.Errorf("link code is invalid or expired; re-run `sonosh auth smapi begin` and use the new code: %w", err)
 				}
 				return err
 			}
@@ -344,7 +344,7 @@ func newSMAPIAuthCompleteCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&serviceName, "service", "Spotify", "Music service name (as shown in `sonosh smapi services`)")
-	cmd.Flags().StringVar(&linkCode, "code", "", "Link code from `sonos auth smapi begin`")
+	cmd.Flags().StringVar(&linkCode, "code", "", "Link code from `sonosh auth smapi begin`")
 	cmd.Flags().StringVar(&linkDeviceID, "link-device-id", "", "Optional link device id (returned by begin; usually not needed)")
 	cmd.Flags().DurationVar(&wait, "wait", 0, "Wait up to this duration for linking to complete (polls periodically)")
 	_ = cmd.MarkFlagRequired("code")
