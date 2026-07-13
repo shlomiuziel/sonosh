@@ -210,7 +210,7 @@ func launchStreamProxyDaemon(ctx context.Context, cfg streamproxy.ServerConfig, 
 	}
 	defer func() { _ = logFile.Close() }()
 
-	proc := exec.Command(exe, "stream-daemon", "serve", "--config", configPath) //nolint:gosec // re-executes the current sonos binary with a generated config file.
+	proc := exec.Command(exe, "stream-daemon", "serve", "--config", configPath) //nolint:gosec // re-executes the current sonosh binary with a generated config file.
 	proc.Stdout = logFile
 	proc.Stderr = logFile
 	detachProcess(proc)

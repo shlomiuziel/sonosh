@@ -39,7 +39,7 @@ Notes:
 
 - `sonosh --version` prints the version (matches `internal/cli/version.go`)
 - `sonosh --help` works
-- `sonos <cmd> --help` works for core commands (`discover`, `status`, `group`, `open`, `scene`, `smapi`)
+- `sonosh <cmd> --help` works for core commands (`discover`, `status`, `group`, `open`, `scene`, `smapi`)
 
 ### 2) Discovery + topology
 
